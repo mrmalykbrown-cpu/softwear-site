@@ -60,7 +60,38 @@ public class WallpaperPlugin extends Plugin {
         ret.put("title", MediaArt.titleOf(c));
         ret.put("artist", MediaArt.artistOf(c));
         ret.put("hasArt", art != null);
-        if (art != null) ret.put("art", MediaArt.toDataUri(art, 320));
+        if (art != null) ret.put("art", MediaArt.toDataUri(art, 1024));
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void getPlayback(PluginCall call) {
+        Context ctx = getContext();
+        JSObject ret = new JSObject();
+        if (!MediaArt.hasNotificationAccess(ctx)) {
+            ret.put("access", false);
+            ret.put("playing", false);
+            ret.put("position", 0);
+            ret.put("duration", 0);
+            call.resolve(ret);
+            return;
+        }
+        ret.put("access", true);
+        MediaController c = MediaArt.getActiveController(ctx);
+        if (c == null) {
+            ret.put("playing", false);
+            ret.put("position", 0);
+            ret.put("duration", 0);
+            call.resolve(ret);
+            return;
+        }
+        ret.put("playing", MediaArt.isPlaying(c));
+        ret.put("position", MediaArt.positionMs(c) / 1000.0);
+        ret.put("duration", MediaArt.durationMs(c) / 1000.0);
+        ret.put("title", MediaArt.titleOf(c));
+        ret.put("artist", MediaArt.artistOf(c));
+        ret.put("app", c.getPackageName());
+        ret.put("hasArt", MediaArt.extractArt(c.getMetadata()) != null);
         call.resolve(ret);
     }
 
@@ -116,6 +147,35 @@ public class WallpaperPlugin extends Plugin {
         } catch (Exception e) {
             call.reject("APPLY_FAILED", e);
         }
+    }
+
+    @PluginMethod
+    public void mediaControl(PluginCall call) {
+        String action = call.getString("action", "playpause");
+        MediaController c = MediaArt.getActiveController(getContext());
+        if (c == null) {
+            call.reject("NO_SESSION");
+            return;
+        }
+        MediaController.TransportControls tc = c.getTransportControls();
+        switch (action) {
+            case "next":
+                tc.skipToNext();
+                break;
+            case "prev":
+                tc.skipToPrevious();
+                break;
+            case "play":
+                tc.play();
+                break;
+            case "pause":
+                tc.pause();
+                break;
+            default:
+                if (MediaArt.isPlaying(c)) tc.pause();
+                else tc.play();
+        }
+        call.resolve();
     }
 
     @PluginMethod

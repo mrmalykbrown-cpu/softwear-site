@@ -1,199 +1,407 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { PhoneFrame } from "@/components/phone-frame"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Wallpaper } from "@/components/wallpaper"
+import { Lyrics } from "@/components/lyrics"
 import { NowPlayingWidget } from "@/components/now-playing-widget"
 import { TrackGallery } from "@/components/track-gallery"
-import { WebGLShader } from "@/components/ui/web-gl-shader"
-import { LivePanel } from "@/components/live-panel"
-import { SparkleIcon, WifiIcon } from "@/components/icons"
+import { CoverArt } from "@/components/cover-art"
+import { CheckIcon, CloseIcon, DownloadIcon, SparkleIcon, WifiIcon } from "@/components/icons"
 import { tracks } from "@/lib/tracks"
-import { coverGlow, coverToDataUri, downloadCover } from "@/lib/cover"
-import { Wallpaper as NativeWallpaper, isNativeApp } from "@/lib/native-wallpaper"
-import { useReducedMotion } from "@/hooks/use-reduced-motion"
+import { coverIsLight, coverToDataUri, downloadCover, imageIsLight } from "@/lib/cover"
+import { fetchSyncedLyrics, type LyricLine } from "@/lib/lyrics"
+import {
+  Wallpaper as NativeWallpaper,
+  isNativeApp,
+  sourceName,
+  type Playback,
+  type WallpaperTarget,
+} from "@/lib/native-wallpaper"
+
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 
 export function MusicApp() {
-  const reduced = useReducedMotion()
+  // shared UI state
+  const [theme, setTheme] = useState<"light" | "dark">("dark")
+  const [lyricsOn, setLyricsOn] = useState(true)
+  const [lyricSize, setLyricSize] = useState(1)
+  const [clock, setClock] = useState("9:41")
+  const [native, setNative] = useState(false)
+  const [libraryOpen, setLibraryOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [applied, setApplied] = useState(false)
+  const [target, setTarget] = useState<WallpaperTarget>("both")
+  const [autoApply, setAutoApply] = useState(false)
+
+  // demo (web / library) state
   const [index, setIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
   const [progress, setProgress] = useState(0)
-  const [applied, setApplied] = useState(false)
-  const [ambient, setAmbient] = useState(true)
-  const [clock, setClock] = useState("9:41")
-  const [native, setNative] = useState(false)
 
-  const track = tracks[index]
+  // native live state
+  const [live, setLive] = useState<Playback | null>(null)
+  const [liveArt, setLiveArt] = useState<string | undefined>(undefined)
+  const [liveLines, setLiveLines] = useState<LyricLine[]>([])
+  const [liveLoading, setLiveLoading] = useState(false)
+  const [liveLight, setLiveLight] = useState(false)
+  const [preferLive, setPreferLive] = useState(true)
 
-  const goTo = useCallback((i: number) => {
-    setIndex(((i % tracks.length) + tracks.length) % tracks.length)
-    setProgress(0)
-  }, [])
+  const demoTrack = tracks[index]
 
-  const next = useCallback(() => goTo(index + 1), [goTo, index])
-  const prev = useCallback(() => goTo(index - 1), [goTo, index])
+  const liveAvailable = native && !!live?.access && (!!liveArt || !!live?.title)
+  const useLive = liveAvailable && preferLive
 
-  // live lock-screen clock (set after mount to avoid hydration mismatch)
+  // ---- effects ------------------------------------------------------------
+
+  useEffect(() => setNative(isNativeApp()), [])
+
+  useEffect(() => {
+    const el = document.documentElement
+    el.classList.toggle("dark", theme === "dark")
+  }, [theme])
+
   useEffect(() => {
     const tick = () =>
-      setClock(
-        new Date().toLocaleTimeString([], {
-          hour: "numeric",
-          minute: "2-digit",
-        })
-      )
+      setClock(new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))
     tick()
     const id = setInterval(tick, 15_000)
     return () => clearInterval(id)
   }, [])
 
-  // detect native (APK) runtime after mount
-  useEffect(() => setNative(isNativeApp()), [])
-
-  // playback progress
+  // demo progress
   useEffect(() => {
-    if (!isPlaying) return
+    if (useLive || !isPlaying) return
     const id = setInterval(() => {
-      setProgress((p) => Math.min(1, p + 0.5 / track.duration))
-    }, 500)
+      setProgress((p) => Math.min(1, p + 0.4 / demoTrack.duration))
+    }, 400)
     return () => clearInterval(id)
-  }, [isPlaying, track.duration])
+  }, [useLive, isPlaying, demoTrack.duration])
 
-  // auto-advance at end of track
   useEffect(() => {
-    if (progress < 1) return
-    const t = setTimeout(next, 350)
+    if (useLive || progress < 1) return
+    const t = setTimeout(() => {
+      setIndex((i) => (i + 1) % tracks.length)
+      setProgress(0)
+    }, 400)
     return () => clearTimeout(t)
-  }, [progress, next])
+  }, [useLive, progress])
 
-  const setWallpaper = useCallback(async () => {
+  // load saved auto-apply pref on native
+  useEffect(() => {
+    if (!native) return
+    NativeWallpaper.getAutoApply()
+      .then((r) => {
+        setAutoApply(r.enabled)
+        setTarget(r.target)
+      })
+      .catch(() => {})
+  }, [native])
+
+  // native polling: playback + (on track change) art + lyrics
+  useEffect(() => {
+    if (!native) return
+    let alive = true
+    let lastTitle = ""
+    const poll = async () => {
+      try {
+        const p = await NativeWallpaper.getPlayback()
+        if (!alive) return
+        setLive(p)
+        const t = p.title ?? ""
+        if (p.access && t && t !== lastTitle) {
+          lastTitle = t
+          NativeWallpaper.getNowPlaying()
+            .then((np) => {
+              if (!alive) return
+              setLiveArt(np.art)
+              if (np.art) imageIsLight(np.art).then((l) => alive && setLiveLight(l))
+            })
+            .catch(() => {})
+          setLiveLoading(true)
+          fetchSyncedLyrics(t, p.artist ?? "", p.duration).then((lines) => {
+            if (!alive) return
+            setLiveLines(lines ?? [])
+            setLiveLoading(false)
+          })
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    poll()
+    const id = setInterval(poll, 700)
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
+  }, [native])
+
+  // ---- view model ---------------------------------------------------------
+
+  const view = useMemo(() => {
+    if (useLive && live) {
+      return {
+        id: `live:${live.title ?? ""}`,
+        title: live.title || "Unknown track",
+        artist: live.artist || sourceName(live.app),
+        durationSec: live.duration || 0,
+        positionSec: live.position || 0,
+        image: liveArt,
+        cover: undefined,
+        lines: liveLines,
+        lyricsLoading: liveLoading,
+        lightWallpaper: liveLight,
+        isPlaying: !!live.playing,
+      }
+    }
+    return {
+      id: demoTrack.id,
+      title: demoTrack.title,
+      artist: demoTrack.artist,
+      durationSec: demoTrack.duration,
+      positionSec: progress * demoTrack.duration,
+      image: undefined,
+      cover: demoTrack.cover,
+      lines: demoTrack.lines,
+      lyricsLoading: false,
+      lightWallpaper: coverIsLight(demoTrack.cover),
+      isPlaying,
+    }
+  }, [useLive, live, liveArt, liveLines, liveLoading, liveLight, demoTrack, progress, isPlaying])
+
+  const progressFrac = view.durationSec ? clamp(view.positionSec / view.durationSec, 0, 1) : 0
+  const onColor = view.lightWallpaper ? "rgba(12,12,20,0.92)" : "rgba(255,255,255,0.95)"
+  const subColor = view.lightWallpaper ? "rgba(12,12,20,0.6)" : "rgba(255,255,255,0.72)"
+  const scrim = view.lightWallpaper
+    ? "linear-gradient(to bottom, rgba(255,255,255,0.3), transparent 28%, transparent 55%, rgba(255,255,255,0.2))"
+    : "linear-gradient(to bottom, rgba(0,0,0,0.5), transparent 26%, transparent 52%, rgba(0,0,0,0.62))"
+
+  // ---- handlers -----------------------------------------------------------
+
+  const togglePlay = () => {
+    if (useLive) {
+      NativeWallpaper.mediaControl({ action: "playpause" }).catch(() => {})
+      return
+    }
+    setIsPlaying((p) => !p)
+  }
+  const next = () => {
+    if (useLive) {
+      NativeWallpaper.mediaControl({ action: "next" }).catch(() => {})
+      return
+    }
+    setIndex((i) => (i + 1) % tracks.length)
+    setProgress(0)
+  }
+  const prev = () => {
+    if (useLive) {
+      NativeWallpaper.mediaControl({ action: "prev" }).catch(() => {})
+      return
+    }
+    setIndex((i) => (i - 1 + tracks.length) % tracks.length)
+    setProgress(0)
+  }
+
+  const pickTrack = (i: number) => {
+    setIndex(i)
+    setProgress(0)
+    setPreferLive(false)
+    setLibraryOpen(false)
+  }
+
+  const setWallpaperNow = useCallback(async () => {
     setApplied(true)
     try {
-      if (isNativeApp()) {
-        await NativeWallpaper.setWallpaperFromBase64({
-          data: coverToDataUri(track.cover),
-          target: "both",
-        })
+      if (native) {
+        if (useLive) await NativeWallpaper.applyWallpaper({ target })
+        else await NativeWallpaper.setWallpaperFromBase64({ data: coverToDataUri(demoTrack.cover), target })
       } else {
-        await downloadCover(track.cover, `${track.id}-wallpaper`)
+        await downloadCover(demoTrack.cover, `${demoTrack.id}-wallpaper`)
       }
     } catch {
-      // swallow — the toast still confirms the attempt
+      /* toast still shows intent */
     }
     window.setTimeout(() => setApplied(false), 2600)
-  }, [track])
+  }, [native, useLive, target, demoTrack])
+
+  const toggleAuto = async () => {
+    const enabled = !autoApply
+    setAutoApply(enabled)
+    try {
+      await NativeWallpaper.setAutoApply({ enabled, target })
+    } catch {
+      setAutoApply(!enabled)
+    }
+  }
+
+  // ---- render -------------------------------------------------------------
 
   return (
-    <main className="relative min-h-dvh w-full px-5 py-8 sm:px-8 lg:py-14">
-      {/* static gradient backdrop (always present) */}
-      <div
-        className="pointer-events-none fixed inset-0 -z-20 transition-[background] duration-1000"
-        style={{
-          background: `radial-gradient(1200px 700px at 15% -10%, ${coverGlow(
-            track.cover
-          )}33, transparent 60%), radial-gradient(900px 600px at 110% 110%, ${
-            track.cover.to
-          }44, transparent 55%), var(--background)`,
-        }}
-      />
+    <main className="fixed inset-0 overflow-hidden">
+      <Wallpaper id={view.id} spec={view.cover} image={view.image} />
+      <div className="pointer-events-none absolute inset-0 z-[1]" style={{ background: scrim }} />
 
-      {/* animated WebGL ambience (opt-in, off for reduced motion) */}
-      {ambient && !reduced && (
-        <div className="pointer-events-none fixed inset-0 -z-10 opacity-[0.18] blur-3xl saturate-150">
-          <WebGLShader />
+      <div className="relative z-10 mx-auto flex h-full w-full max-w-md flex-col px-5 pb-5 pt-3">
+        {/* status bar */}
+        <div
+          className="flex items-center justify-between text-[11px] font-semibold"
+          style={{ color: onColor }}
+        >
+          <span className="tabular-nums">{clock}</span>
+          <span className="flex items-center gap-1.5">
+            {useLive && live?.app ? sourceName(live.app) : "Prism"}
+            <WifiIcon className="size-3.5" />
+            <Battery color={onColor} />
+          </span>
         </div>
-      )}
 
-      <div className="mx-auto w-full max-w-6xl">
-        <Header ambient={ambient} reduced={reduced} onToggleAmbient={() => setAmbient((a) => !a)} />
-
-        <div className="mt-10 grid items-start gap-12 lg:mt-14 lg:grid-cols-[330px_1fr]">
-          {/* phone */}
-          <div className="mx-auto lg:sticky lg:top-10">
-            <div className={reduced ? "" : "animate-float"}>
-              <PhoneFrame>
-                <Wallpaper id={track.id} spec={track.cover} />
-
-                {/* legibility scrim */}
-                <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-black/35 via-transparent to-black/65" />
-
-                {/* screen UI */}
-                <div className="absolute inset-0 z-20 flex flex-col">
-                  {/* status bar */}
-                  <div className="flex items-center justify-between px-7 pt-3.5 text-[11px] font-semibold text-white">
-                    <span className="tabular-nums">{clock}</span>
-                    <span className="flex items-center gap-1.5">
-                      <WifiIcon className="size-3.5" />
-                      <Battery />
-                    </span>
-                  </div>
-
-                  {/* lock-screen clock */}
-                  <div className="mt-6 px-7 text-center text-white">
-                    <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/70">
-                      {new Date().toLocaleDateString([], {
-                        weekday: "long",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </p>
-                    <p className="mt-1 text-6xl font-light tabular-nums leading-none drop-shadow-lg">
-                      {clock}
-                    </p>
-                  </div>
-
-                  {/* widget */}
-                  <div className="mt-auto px-3 pb-7">
-                    <NowPlayingWidget
-                      track={track}
-                      isPlaying={isPlaying}
-                      progress={progress}
-                      applied={applied}
-                      onToggle={() => setIsPlaying((p) => !p)}
-                      onPrev={prev}
-                      onNext={next}
-                      onSetWallpaper={setWallpaper}
-                    />
-                  </div>
-                </div>
-              </PhoneFrame>
-            </div>
-          </div>
-
-          {/* gallery / now playing */}
-          <div>
-            {native && (
-              <div className="mb-8">
-                <LivePanel />
-              </div>
-            )}
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="flex size-2 items-center justify-center">
-                <span className="size-2 animate-ping rounded-full bg-[var(--play)]" />
-              </span>
-              Now playing
-            </div>
-            <h2 className="mt-1 font-display text-4xl text-white sm:text-5xl">
-              {track.title}
-            </h2>
-            <p className="mt-1 text-lg text-muted-foreground">{track.artist}</p>
-
-            <p className="mt-6 max-w-md text-sm leading-relaxed text-muted-foreground">
-              Pick any cover and watch it morph into the phone&apos;s wallpaper with a
-              smooth crossfade. Drive playback from the liquid-glass widget, then hit{" "}
-              <span className="font-medium text-white">Set as wallpaper</span> to export
-              the artwork at full phone resolution.
-            </p>
-
-            <h3 className="mt-9 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Art library
-            </h3>
-            <div className="mt-3">
-              <TrackGallery tracks={tracks} currentId={track.id} onSelect={goTo} />
-            </div>
-          </div>
+        {/* clock */}
+        <div className="mt-2 text-center" style={{ color: onColor }}>
+          <p
+            className="text-[11px] font-medium uppercase tracking-[0.2em]"
+            style={{ color: subColor }}
+          >
+            {new Date().toLocaleDateString([], {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+          </p>
+          <p className="font-light tabular-nums leading-none" style={{ fontSize: "clamp(3rem,15vw,4.5rem)" }}>
+            {clock}
+          </p>
         </div>
+
+        {/* center: lyrics or big art */}
+        <div className="relative my-3 min-h-0 flex-1">
+          {lyricsOn ? (
+            <Lyrics
+              lines={view.lines}
+              positionSec={view.positionSec}
+              lightWallpaper={view.lightWallpaper}
+              sizeScale={lyricSize}
+              loading={view.lyricsLoading}
+              onSeek={
+                useLive ? undefined : (sec) => setProgress(clamp(sec / view.durationSec, 0, 1))
+              }
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              {view.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={view.image}
+                  alt=""
+                  className="aspect-square w-[78%] rounded-3xl object-cover shadow-2xl ring-1 ring-white/15"
+                />
+              ) : (
+                <CoverArt
+                  spec={view.cover!}
+                  className="aspect-square w-[78%] rounded-3xl shadow-2xl ring-1 ring-white/15"
+                />
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* widget */}
+        <NowPlayingWidget
+          title={view.title}
+          artist={view.artist}
+          cover={view.cover}
+          image={view.image}
+          isPlaying={view.isPlaying}
+          progress={progressFrac}
+          durationSec={view.durationSec}
+          lyricsOn={lyricsOn}
+          theme={theme}
+          onToggle={togglePlay}
+          onPrev={prev}
+          onNext={next}
+          onToggleLyrics={() => setLyricsOn((v) => !v)}
+          onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+          onLyricSize={(d) => setLyricSize((s) => clamp(s + d * 0.12, 0.7, 1.8))}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenLibrary={() => setLibraryOpen(true)}
+        />
       </div>
+
+      {/* library sheet */}
+      <Sheet open={libraryOpen} onClose={() => setLibraryOpen(false)} title="Art library">
+        {native && !preferLive && liveAvailable && (
+          <button
+            onClick={() => {
+              setPreferLive(true)
+              setLibraryOpen(false)
+            }}
+            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
+          >
+            <SparkleIcon className="size-4" /> Sync with my music
+          </button>
+        )}
+        <TrackGallery tracks={tracks} currentId={demoTrack.id} onSelect={pickTrack} />
+      </Sheet>
+
+      {/* settings sheet */}
+      <Sheet open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Wallpaper">
+        <p className="mb-4 text-sm text-muted-foreground">
+          {native
+            ? useLive
+              ? "Sets your real wallpaper from the cover playing now."
+              : "Sets your real wallpaper from the selected art."
+            : "Exports the artwork as a phone-resolution image (open it as an APK to set it directly)."}
+        </p>
+
+        {native && (
+          <>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Apply to
+            </p>
+            <div className="mb-4 grid grid-cols-3 gap-2">
+              {(["home", "lock", "both"] as WallpaperTarget[]).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTarget(t)}
+                  aria-pressed={target === t}
+                  className={`rounded-xl border px-3 py-2 text-sm font-medium capitalize transition-colors ${
+                    target === t
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-foreground hover:bg-accent"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        <button
+          onClick={setWallpaperNow}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
+        >
+          {applied ? <CheckIcon className="size-4" /> : <DownloadIcon className="size-4" />}
+          {applied ? "Done" : native ? "Set wallpaper now" : "Download wallpaper"}
+        </button>
+
+        {native && (
+          <button
+            onClick={toggleAuto}
+            aria-pressed={autoApply}
+            className="mt-3 flex w-full items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-accent"
+          >
+            <span>
+              <span className="block text-sm font-medium text-foreground">
+                Auto-update on song change
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                Wallpaper follows your music
+              </span>
+            </span>
+            <Switch on={autoApply} />
+          </button>
+        )}
+      </Sheet>
 
       {/* toast */}
       <div
@@ -201,67 +409,90 @@ export function MusicApp() {
         className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4"
       >
         <div
-          className={`rounded-full border border-white/15 bg-black/70 px-5 py-2.5 text-sm text-white shadow-2xl backdrop-blur-xl transition-all duration-300 ${
-            applied
-              ? "translate-y-0 opacity-100"
-              : "pointer-events-none translate-y-3 opacity-0"
+          className={`glass rounded-full px-5 py-2.5 text-sm font-medium text-foreground transition-all duration-300 ${
+            applied ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
           }`}
         >
-          {native
-            ? "Wallpaper updated on your device."
-            : "Wallpaper saved to your downloads — set it from Photos to apply on a device."}
+          {native ? "Wallpaper updated." : "Wallpaper image downloaded."}
         </div>
       </div>
     </main>
   )
 }
 
-function Header({
-  ambient,
-  reduced,
-  onToggleAmbient,
+function Sheet({
+  open,
+  onClose,
+  title,
+  children,
 }: {
-  ambient: boolean
-  reduced: boolean
-  onToggleAmbient: () => void
+  open: boolean
+  onClose: () => void
+  title: string
+  children: React.ReactNode
 }) {
   return (
-    <header className="flex items-center justify-between gap-4">
-      <div className="flex items-center gap-3">
-        <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-secondary shadow-lg shadow-primary/30">
-          <SparkleIcon className="size-5 text-white" />
-        </span>
-        <div>
-          <p className="font-display text-xl leading-none text-white">Prism</p>
-          <p className="text-xs text-muted-foreground">Music art wallpapers</p>
-        </div>
-      </div>
-
-      <button
-        onClick={onToggleAmbient}
-        disabled={reduced}
-        aria-pressed={ambient && !reduced}
-        className="flex cursor-pointer items-center gap-2 rounded-full border border-border bg-card/60 px-3.5 py-2 text-xs font-medium text-foreground outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-        title={reduced ? "Disabled while reduced motion is on" : "Toggle animated ambience"}
+    <>
+      <div
+        onClick={onClose}
+        aria-hidden
+        className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 ${
+          open ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      />
+      <div
+        role="dialog"
+        aria-label={title}
+        className={`glass fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[80vh] w-full max-w-md overflow-y-auto rounded-t-3xl p-5 pb-8 transition-transform duration-300 ${
+          open ? "translate-y-0" : "translate-y-full"
+        }`}
       >
-        <span
-          className={`size-2 rounded-full transition-colors ${
-            ambient && !reduced ? "bg-[var(--play)]" : "bg-muted-foreground"
-          }`}
-        />
-        Ambient FX
-      </button>
-    </header>
+        <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-foreground/25" />
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-display text-xl text-foreground">{title}</h2>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="grid size-8 place-items-center rounded-full text-foreground transition-colors hover:bg-accent"
+          >
+            <CloseIcon className="size-5" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </>
   )
 }
 
-function Battery() {
+function Switch({ on }: { on: boolean }) {
+  return (
+    <span
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+        on ? "bg-[var(--play)]" : "bg-muted"
+      }`}
+    >
+      <span
+        className={`absolute top-0.5 size-5 rounded-full bg-white transition-all ${
+          on ? "left-[22px]" : "left-0.5"
+        }`}
+      />
+    </span>
+  )
+}
+
+function Battery({ color }: { color: string }) {
   return (
     <span className="flex items-center gap-0.5" aria-label="Battery">
-      <span className="relative h-3 w-6 rounded-[3px] border border-white/70">
-        <span className="absolute inset-[1.5px] right-1.5 rounded-[1px] bg-white" />
+      <span
+        className="relative h-3 w-6 rounded-[3px] border"
+        style={{ borderColor: color }}
+      >
+        <span
+          className="absolute inset-[1.5px] right-1.5 rounded-[1px]"
+          style={{ background: color }}
+        />
       </span>
-      <span className="h-1.5 w-0.5 rounded-r bg-white/70" />
+      <span className="h-1.5 w-0.5 rounded-r" style={{ background: color }} />
     </span>
   )
 }

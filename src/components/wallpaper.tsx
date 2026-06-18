@@ -5,39 +5,45 @@ import { CoverArt } from "@/components/cover-art"
 import type { CoverSpec } from "@/lib/cover"
 import { useReducedMotion } from "@/hooks/use-reduced-motion"
 
-interface Layer {
+interface Source {
+  spec?: CoverSpec
+  image?: string
+}
+
+interface Layer extends Source {
   key: number
-  spec: CoverSpec
 }
 
 let counter = 0
 
 /**
- * Full-bleed wallpaper that crossfades between covers.
+ * Full-screen wallpaper that crossfades between covers.
  *
- * When `id` changes a new layer is stacked on top and fades in (opacity +
- * scale + blur, ease-out per the design system). The old layer stays opaque
- * underneath so there is never a flash, then is pruned once the transition
- * settles. Reduced-motion users get an instant, blur-free swap.
+ * Accepts either a mesh-gradient `spec` (demo) or an `image` data-URI (real
+ * album art on device). A new layer fades in over the previous one — gentle
+ * opacity + slight scale + slight blur with a soft ease, so track changes
+ * blend smoothly instead of snapping. Old layers are pruned after the blend.
  */
 export function Wallpaper({
   id,
   spec,
+  image,
   className = "",
 }: {
   id: string
-  spec: CoverSpec
+  spec?: CoverSpec
+  image?: string
   className?: string
 }) {
   const reduced = useReducedMotion()
-  const [layers, setLayers] = useState<Layer[]>([{ key: counter++, spec }])
+  const [layers, setLayers] = useState<Layer[]>([{ key: counter++, spec, image }])
   const lastId = useRef(id)
 
   useEffect(() => {
     if (id === lastId.current) return
     lastId.current = id
-    setLayers((prev) => [...prev, { key: counter++, spec }])
-    const t = setTimeout(() => setLayers((prev) => prev.slice(-1)), reduced ? 80 : 950)
+    setLayers((prev) => [...prev, { key: counter++, spec, image }])
+    const t = setTimeout(() => setLayers((prev) => prev.slice(-1)), reduced ? 90 : 1500)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
@@ -48,6 +54,7 @@ export function Wallpaper({
         <WallpaperLayer
           key={layer.key}
           spec={layer.spec}
+          image={layer.image}
           fadeIn={i === layers.length - 1 && layers.length > 1}
           reduced={reduced}
         />
@@ -58,13 +65,10 @@ export function Wallpaper({
 
 function WallpaperLayer({
   spec,
+  image,
   fadeIn,
   reduced,
-}: {
-  spec: CoverSpec
-  fadeIn: boolean
-  reduced: boolean
-}) {
+}: Source & { fadeIn: boolean; reduced: boolean }) {
   const [shown, setShown] = useState(!fadeIn)
 
   useEffect(() => {
@@ -73,18 +77,31 @@ function WallpaperLayer({
     return () => cancelAnimationFrame(r)
   }, [fadeIn])
 
+  const style = {
+    opacity: shown ? 1 : 0,
+    transform: reduced ? undefined : shown ? "scale(1)" : "scale(1.04)",
+    filter: reduced ? undefined : shown ? "blur(0px)" : "blur(8px)",
+    transition: reduced
+      ? "opacity 140ms linear"
+      : "opacity 1100ms ease, transform 1500ms cubic-bezier(0.22,1,0.36,1), filter 1100ms ease",
+    willChange: "opacity, transform",
+  } as const
+
+  if (image) {
+    return (
+      <div
+        aria-hidden
+        className="absolute inset-0 h-full w-full bg-cover bg-center"
+        style={{ backgroundImage: `url(${image})`, ...style }}
+      />
+    )
+  }
+
   return (
     <CoverArt
-      spec={spec}
-      className="absolute inset-0 h-full w-full will-change-[opacity,transform]"
-      style={{
-        opacity: shown ? 1 : 0,
-        transform: reduced ? undefined : shown ? "scale(1)" : "scale(1.08)",
-        filter: reduced ? undefined : shown ? "blur(0px)" : "blur(12px)",
-        transition: reduced
-          ? "opacity 120ms linear"
-          : "opacity 900ms ease-out, transform 900ms ease-out, filter 900ms ease-out",
-      }}
+      spec={spec!}
+      className="absolute inset-0 h-full w-full"
+      style={style}
     />
   )
 }

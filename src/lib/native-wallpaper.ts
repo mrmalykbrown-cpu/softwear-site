@@ -14,10 +14,31 @@ export interface NowPlaying {
   art?: string
 }
 
+export interface Playback {
+  access: boolean
+  playing: boolean
+  /** seconds */
+  position: number
+  /** seconds */
+  duration: number
+  app?: string
+  title?: string | null
+  artist?: string | null
+  hasArt?: boolean
+  /** data: URI of the album art (full size we can read) */
+  art?: string
+}
+
 export interface WallpaperPlugin {
   hasNotificationAccess(): Promise<{ granted: boolean }>
   openNotificationAccess(): Promise<void>
   getNowPlaying(): Promise<NowPlaying>
+  /** Rich now-playing snapshot incl. position/duration for lyric sync. */
+  getPlayback(): Promise<Playback>
+  /** Control the active media session (Spotify / Apple Music / ...). */
+  mediaControl(opts: {
+    action: "playpause" | "play" | "pause" | "next" | "prev"
+  }): Promise<void>
   applyWallpaper(opts: { target: WallpaperTarget }): Promise<{
     applied: boolean
     target: string

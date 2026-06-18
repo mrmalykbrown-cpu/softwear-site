@@ -17,6 +17,7 @@ import android.media.session.MediaController;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
 import android.os.Build;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Base64;
 import android.util.DisplayMetrics;
@@ -101,6 +102,28 @@ public class MediaArt {
     public static String artistOf(MediaController c) {
         MediaMetadata md = c == null ? null : c.getMetadata();
         return md == null ? null : md.getString(MediaMetadata.METADATA_KEY_ARTIST);
+    }
+
+    public static boolean isPlaying(MediaController c) {
+        PlaybackState ps = c == null ? null : c.getPlaybackState();
+        return ps != null && ps.getState() == PlaybackState.STATE_PLAYING;
+    }
+
+    /** Current playback position in ms, extrapolated for smooth lyric sync. */
+    public static long positionMs(MediaController c) {
+        PlaybackState ps = c == null ? null : c.getPlaybackState();
+        if (ps == null) return 0;
+        long pos = ps.getPosition();
+        if (ps.getState() == PlaybackState.STATE_PLAYING) {
+            long delta = SystemClock.elapsedRealtime() - ps.getLastPositionUpdateTime();
+            pos += (long) (delta * ps.getPlaybackSpeed());
+        }
+        return Math.max(0, pos);
+    }
+
+    public static long durationMs(MediaController c) {
+        MediaMetadata md = c == null ? null : c.getMetadata();
+        return md == null ? 0 : md.getLong(MediaMetadata.METADATA_KEY_DURATION);
     }
 
     /** Compose a phone-sized wallpaper: soft-blurred zoomed art + centered crisp cover. */

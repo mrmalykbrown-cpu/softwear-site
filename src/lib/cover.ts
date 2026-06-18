@@ -49,6 +49,54 @@ export function rgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
+function relLuminance(hex: string): number {
+  const lin = hexToRgb(hex).map((v) => {
+    const s = v / 255
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+  })
+  return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+}
+
+/** Is this cover light overall? Used to pick a contrasting lyric color. */
+export function coverIsLight(spec: CoverSpec): boolean {
+  let sum = (relLuminance(spec.from) + relLuminance(spec.to)) * 0.6
+  let weight = 1.2
+  for (const b of spec.blobs) {
+    sum += relLuminance(b.color) * b.alpha
+    weight += b.alpha
+  }
+  return sum / weight > 0.42
+}
+
+/** Average luminance of an image (data URI ok) -> is it light? */
+export function imageIsLight(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof document === "undefined") return resolve(false)
+    const img = new Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      try {
+        const c = document.createElement("canvas")
+        c.width = 16
+        c.height = 16
+        const ctx = c.getContext("2d")
+        if (!ctx) return resolve(false)
+        ctx.drawImage(img, 0, 0, 16, 16)
+        const d = ctx.getImageData(0, 0, 16, 16).data
+        let sum = 0
+        for (let i = 0; i < d.length; i += 4) {
+          sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]
+        }
+        resolve(sum / (d.length / 4) / 255 > 0.55)
+      } catch {
+        resolve(false)
+      }
+    }
+    img.onerror = () => resolve(false)
+    img.src = url
+  })
+}
+
 /** A CSS `background` value (layered radial gradients over a linear base). */
 export function coverBackground(spec: CoverSpec): string {
   const layers = spec.blobs.map(
