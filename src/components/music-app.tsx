@@ -6,9 +6,11 @@ import { Wallpaper } from "@/components/wallpaper"
 import { NowPlayingWidget } from "@/components/now-playing-widget"
 import { TrackGallery } from "@/components/track-gallery"
 import { WebGLShader } from "@/components/ui/web-gl-shader"
+import { LivePanel } from "@/components/live-panel"
 import { SparkleIcon, WifiIcon } from "@/components/icons"
 import { tracks } from "@/lib/tracks"
-import { coverGlow, downloadCover } from "@/lib/cover"
+import { coverGlow, coverToDataUri, downloadCover } from "@/lib/cover"
+import { Wallpaper as NativeWallpaper, isNativeApp } from "@/lib/native-wallpaper"
 import { useReducedMotion } from "@/hooks/use-reduced-motion"
 
 export function MusicApp() {
@@ -19,6 +21,7 @@ export function MusicApp() {
   const [applied, setApplied] = useState(false)
   const [ambient, setAmbient] = useState(true)
   const [clock, setClock] = useState("9:41")
+  const [native, setNative] = useState(false)
 
   const track = tracks[index]
 
@@ -44,6 +47,9 @@ export function MusicApp() {
     return () => clearInterval(id)
   }, [])
 
+  // detect native (APK) runtime after mount
+  useEffect(() => setNative(isNativeApp()), [])
+
   // playback progress
   useEffect(() => {
     if (!isPlaying) return
@@ -62,7 +68,18 @@ export function MusicApp() {
 
   const setWallpaper = useCallback(async () => {
     setApplied(true)
-    await downloadCover(track.cover, `${track.id}-wallpaper`)
+    try {
+      if (isNativeApp()) {
+        await NativeWallpaper.setWallpaperFromBase64({
+          data: coverToDataUri(track.cover),
+          target: "both",
+        })
+      } else {
+        await downloadCover(track.cover, `${track.id}-wallpaper`)
+      }
+    } catch {
+      // swallow — the toast still confirms the attempt
+    }
     window.setTimeout(() => setApplied(false), 2600)
   }, [track])
 
@@ -145,6 +162,11 @@ export function MusicApp() {
 
           {/* gallery / now playing */}
           <div>
+            {native && (
+              <div className="mb-8">
+                <LivePanel />
+              </div>
+            )}
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="flex size-2 items-center justify-center">
                 <span className="size-2 animate-ping rounded-full bg-[var(--play)]" />
@@ -185,7 +207,9 @@ export function MusicApp() {
               : "pointer-events-none translate-y-3 opacity-0"
           }`}
         >
-          Wallpaper saved to your downloads — set it from Photos to apply on a device.
+          {native
+            ? "Wallpaper updated on your device."
+            : "Wallpaper saved to your downloads — set it from Photos to apply on a device."}
         </div>
       </div>
     </main>

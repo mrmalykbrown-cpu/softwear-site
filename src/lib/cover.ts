@@ -117,6 +117,12 @@ export function renderCoverToCanvas(
   return canvas
 }
 
+/** Render the cover to a phone-sized JPEG data URI (for native wallpaper set). */
+export function coverToDataUri(spec: CoverSpec, width = 1170, height = 2532): string {
+  const canvas = renderCoverToCanvas(spec, width, height)
+  return canvas.toDataURL("image/jpeg", 0.9)
+}
+
 /** Export the cover as a PNG sized for a phone screen and trigger a download. */
 export function downloadCover(
   spec: CoverSpec,
