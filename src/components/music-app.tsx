@@ -1,6 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { motion, useMotionValue } from "motion/react"
+import { Haptics, ImpactStyle } from "@capacitor/haptics"
 import { Wallpaper } from "@/components/wallpaper"
 import { Lyrics } from "@/components/lyrics"
 import { NowPlayingWidget } from "@/components/now-playing-widget"
@@ -27,6 +29,10 @@ import {
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 
+function haptic(style: ImpactStyle = ImpactStyle.Light) {
+  if (isNativeApp()) Haptics.impact({ style }).catch(() => {})
+}
+
 export function MusicApp() {
   // shared UI state
   const [theme, setTheme] = useState<"light" | "dark">("dark")
@@ -45,6 +51,7 @@ export function MusicApp() {
   const [index, setIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
   const [progress, setProgress] = useState(0)
+  const dragX = useMotionValue(0)
 
   // native live state
   const [live, setLive] = useState<Playback | null>(null)
@@ -192,6 +199,7 @@ export function MusicApp() {
   // ---- handlers -----------------------------------------------------------
 
   const togglePlay = () => {
+    haptic()
     if (useLive) {
       NativeWallpaper.mediaControl({ action: "playpause" }).catch(() => {})
       return
@@ -199,6 +207,7 @@ export function MusicApp() {
     setIsPlaying((p) => !p)
   }
   const next = () => {
+    haptic()
     if (useLive) {
       NativeWallpaper.mediaControl({ action: "next" }).catch(() => {})
       return
@@ -207,6 +216,7 @@ export function MusicApp() {
     setProgress(0)
   }
   const prev = () => {
+    haptic()
     if (useLive) {
       NativeWallpaper.mediaControl({ action: "prev" }).catch(() => {})
       return
@@ -216,6 +226,7 @@ export function MusicApp() {
   }
 
   const pickTrack = (i: number) => {
+    haptic()
     setIndex(i)
     setProgress(0)
     setPreferLive(false)
@@ -223,6 +234,7 @@ export function MusicApp() {
   }
 
   const setWallpaperNow = useCallback(async () => {
+    haptic(ImpactStyle.Medium)
     setApplied(true)
     try {
       if (native) {
@@ -251,7 +263,13 @@ export function MusicApp() {
 
   return (
     <main className="fixed inset-0 overflow-hidden">
-      <Wallpaper id={view.id} spec={view.cover ?? demoTrack.cover} image={view.image} />
+      <Wallpaper
+        id={view.id}
+        spec={view.cover ?? demoTrack.cover}
+        image={view.image}
+        playing={view.isPlaying}
+        dragX={dragX}
+      />
       <div className="pointer-events-none absolute inset-0 z-[1]" style={{ background: scrim }} />
 
       <div className="relative z-10 mx-auto flex h-full w-full max-w-md flex-col px-5 pb-5 pt-3">
@@ -323,7 +341,36 @@ export function MusicApp() {
               )}
             </div>
           )}
+
+          {/* swipe the art left / right to change track */}
+          <motion.div
+            className="absolute inset-0 z-20"
+            drag="x"
+            dragDirectionLock
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.5}
+            style={{ x: dragX, touchAction: "pan-y" }}
+            onDragEnd={(_, info) => {
+              if (info.offset.x < -55 || info.velocity.x < -450) next()
+              else if (info.offset.x > 55 || info.velocity.x > 450) prev()
+            }}
+          />
         </div>
+
+        {/* page indicator — also hints the art is swipeable */}
+        {!useLive && (
+          <div className="mb-3 flex items-center justify-center gap-1.5" aria-hidden>
+            {tracks.map((t, i) => (
+              <motion.span
+                key={t.id}
+                className="h-1.5 rounded-full"
+                animate={{ width: i === index ? 18 : 6, opacity: i === index ? 0.95 : 0.4 }}
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                style={{ background: onColor }}
+              />
+            ))}
+          </div>
+        )}
 
         {/* widget */}
         <NowPlayingWidget

@@ -1,146 +1,149 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import {
+  AnimatePresence,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useTransform,
+  type MotionValue,
+} from "motion/react"
 import { CoverArt } from "@/components/cover-art"
 import type { CoverSpec } from "@/lib/cover"
-import { useReducedMotion } from "@/hooks/use-reduced-motion"
-
-interface Source {
-  spec?: CoverSpec
-  image?: string
-}
-
-interface Layer extends Source {
-  key: number
-}
-
-type LayerState = "enter" | "leave" | "static"
-
-let counter = 0
 
 /**
- * Full-screen wallpaper transition.
+ * Living full-screen wallpaper.
  *
- * The KEY rule: the outgoing cover stays fully opaque underneath the whole
- * time, so the page background is never visible — no black-out flash, ever.
- * The incoming cover blooms in on top via an expanding circular reveal with a
- * zoom-down and blur-to-sharp, so the change is vivid rather than a flat fade.
+ * Transition rule: the outgoing cover stays fully opaque underneath (zIndex 1)
+ * so the page background is never visible — no black-out. The incoming cover
+ * (zIndex 2) springs in on top: scaling down from an over-zoom with a quick
+ * blur-bloom and brightness pop, settling with real spring physics.
+ *
+ * Between changes the art is never static: it slowly breathes and drifts
+ * (Ken Burns) while playing, with a soft specular light gliding across it.
  */
 export function Wallpaper({
   id,
   spec,
   image,
+  playing = true,
+  dragX,
   className = "",
 }: {
   id: string
   spec?: CoverSpec
   image?: string
+  playing?: boolean
+  dragX?: MotionValue<number>
   className?: string
 }) {
-  const reduced = useReducedMotion()
-  const [layers, setLayers] = useState<Layer[]>([{ key: counter++, spec, image }])
-  const lastId = useRef(id)
+  const reduce = useReducedMotion()
+  const fallback = useMotionValue(0)
+  const parallaxX = useTransform(dragX ?? fallback, (v) => v * 0.16)
 
-  useEffect(() => {
-    if (id === lastId.current) return
-    lastId.current = id
-    setLayers((prev) => [...prev, { key: counter++, spec, image }])
-    // prune only AFTER the incoming layer fully covers the old one
-    const t = setTimeout(() => setLayers((prev) => prev.slice(-1)), reduced ? 260 : 1150)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
-
-  const last = layers.length - 1
   return (
     <div className={`absolute inset-0 overflow-hidden ${className}`}>
-      {layers.map((layer, i) => {
-        const state: LayerState =
-          layers.length > 1 && i === last
-            ? "enter"
-            : layers.length > 1 && i === last - 1
-              ? "leave"
-              : "static"
-        return (
-          <WallpaperLayer
-            key={layer.key}
-            spec={layer.spec}
-            image={layer.image}
-            state={state}
-            reduced={reduced}
-          />
-        )
-      })}
+      <AnimatePresence initial={false}>
+        <motion.div
+          key={id}
+          className="absolute inset-0"
+          style={{ willChange: "transform, opacity, filter" }}
+          initial={
+            reduce
+              ? { opacity: 0, zIndex: 2 }
+              : {
+                  opacity: 0,
+                  scale: 1.12,
+                  filter: "blur(14px) saturate(1.5) brightness(1.16)",
+                  zIndex: 2,
+                }
+          }
+          animate={
+            reduce
+              ? { opacity: 1, zIndex: 2 }
+              : {
+                  opacity: 1,
+                  scale: 1,
+                  filter: "blur(0px) saturate(1) brightness(1)",
+                  zIndex: 2,
+                }
+          }
+          exit={
+            reduce
+              ? { opacity: 1, zIndex: 1, transition: { duration: 0.25 } }
+              : {
+                  opacity: 1,
+                  scale: 1.05,
+                  filter: "blur(2px) brightness(0.9)",
+                  zIndex: 1,
+                  transition: { duration: 0.9, ease: [0.4, 0, 0.2, 1] },
+                }
+          }
+          transition={{
+            opacity: { duration: reduce ? 0.3 : 0.55, ease: [0.33, 0, 0.2, 1] },
+            scale: { type: "spring", stiffness: 110, damping: 20, mass: 1 },
+            filter: { duration: 0.65, ease: "easeOut" },
+          }}
+        >
+          <motion.div className="absolute inset-0" style={{ x: parallaxX }}>
+            <BreathingArt spec={spec} image={image} playing={playing} reduce={!!reduce} />
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   )
 }
 
-function WallpaperLayer({
+function BreathingArt({
   spec,
   image,
-  state,
-  reduced,
-}: Source & { state: LayerState; reduced: boolean }) {
-  const isEnter = state === "enter"
-  const [armed, setArmed] = useState(!isEnter)
-
-  useEffect(() => {
-    if (!isEnter) return
-    const r = requestAnimationFrame(() => requestAnimationFrame(() => setArmed(true)))
-    return () => cancelAnimationFrame(r)
-  }, [isEnter])
-
-  const REST = {
-    opacity: 1,
-    transform: "scale(1)",
-    filter: "blur(0px) saturate(1) brightness(1)",
-    clipPath: "circle(150% at 50% 52%)",
-  }
-  // incoming starts as a tiny, bright, zoomed, blurred seed and blooms outward
-  const ENTER_FROM = {
-    opacity: 1,
-    transform: "scale(1.18)",
-    filter: "blur(16px) saturate(1.5) brightness(1.18)",
-    clipPath: "circle(0% at 50% 52%)",
-  }
-  // outgoing stays fully opaque (no black-out), just drifts back in scale
-  const LEAVE_TO = {
-    opacity: 1,
-    transform: "scale(1.07)",
-    filter: "blur(2px) saturate(1) brightness(0.92)",
-    clipPath: "circle(150% at 50% 52%)",
-  }
-
-  let s: typeof REST
-  if (reduced) {
-    // simple opaque swap: old stays, new fades in quickly on top (still no black)
-    s = isEnter
-      ? { ...REST, opacity: armed ? 1 : 0 }
-      : REST
-  } else if (isEnter) {
-    s = armed ? REST : ENTER_FROM
-  } else if (state === "leave") {
-    s = LEAVE_TO
-  } else {
-    s = REST
-  }
-
-  const transition = reduced
-    ? "opacity 260ms ease"
-    : "transform 1100ms cubic-bezier(0.22,1,0.36,1), filter 850ms ease, clip-path 950ms cubic-bezier(0.22,1,0.36,1)"
-
-  const style = { ...s, transition, willChange: "transform, clip-path, filter" } as const
-
-  if (image) {
-    return (
-      <div
-        aria-hidden
-        className="absolute inset-0 h-full w-full bg-cover bg-center"
-        style={{ backgroundImage: `url(${image})`, ...style }}
-      />
-    )
-  }
+  playing,
+  reduce,
+}: {
+  spec?: CoverSpec
+  image?: string
+  playing: boolean
+  reduce: boolean
+}) {
+  const alive = !reduce && playing
   return (
-    <CoverArt spec={spec!} className="absolute inset-0 h-full w-full" style={style} />
+    <motion.div
+      className="absolute inset-0"
+      style={{ willChange: "transform" }}
+      animate={alive ? { scale: [1, 1.05, 1], x: [0, -7, 0], y: [0, -5, 0] } : { scale: 1, x: 0, y: 0 }}
+      transition={
+        alive
+          ? { duration: 18, repeat: Infinity, ease: "easeInOut" }
+          : { duration: 0.8, ease: "easeOut" }
+      }
+    >
+      {image ? (
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${image})`, transform: "scale(1.08)" }}
+        />
+      ) : (
+        <CoverArt
+          spec={spec!}
+          className="absolute inset-0"
+          style={{ transform: "scale(1.08)" }}
+        />
+      )}
+
+      {!reduce && (
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(45% 45% at 50% 45%, rgba(255,255,255,0.10), rgba(255,255,255,0) 70%)",
+            mixBlendMode: "soft-light",
+          }}
+          animate={{ x: ["-28%", "30%", "-28%"], y: ["-12%", "14%", "-12%"] }}
+          transition={{ duration: 24, repeat: Infinity, ease: "easeInOut" }}
+        />
+      )}
+    </motion.div>
   )
 }

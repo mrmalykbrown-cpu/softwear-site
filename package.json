@@ -12,9 +12,11 @@
   "dependencies": {
     "@capacitor/android": "^7.6.6",
     "@capacitor/core": "^7.6.6",
+    "@capacitor/haptics": "^7.0.5",
     "@radix-ui/react-slot": "^1.1.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "motion": "^12.40.0",
     "next": "^15.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

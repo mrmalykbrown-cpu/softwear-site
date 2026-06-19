@@ -1,5 +1,7 @@
 "use client"
 
+import { AnimatePresence, motion } from "motion/react"
+import type { ReactNode } from "react"
 import { LiquidButton } from "@/components/ui/liquid-glass-button"
 import { CoverArt } from "@/components/cover-art"
 import {
@@ -22,7 +24,6 @@ interface WidgetProps {
   cover?: CoverSpec
   image?: string
   isPlaying: boolean
-  /** 0–1 */
   progress: number
   durationSec: number
   lyricsOn: boolean
@@ -37,10 +38,9 @@ interface WidgetProps {
   onOpenLibrary: () => void
 }
 
-/**
- * Samsung-blur glass control widget: liquid-glass transport plus a row of
- * option toggles (lyrics, day/night, lyric size, wallpaper, library).
- */
+const press = { type: "spring" as const, stiffness: 520, damping: 30 }
+
+/** Samsung-blur glass control widget with spring-tactile, bezel-free controls. */
 export function NowPlayingWidget(props: WidgetProps) {
   const {
     title,
@@ -90,9 +90,10 @@ export function NowPlayingWidget(props: WidgetProps) {
       {/* progress */}
       <div className="mt-3">
         <div className="h-1 w-full overflow-hidden rounded-full bg-foreground/15">
-          <div
-            className="h-full rounded-full bg-foreground transition-[width] duration-500 ease-linear"
-            style={{ width: `${Math.min(100, progress * 100)}%` }}
+          <motion.div
+            className="h-full rounded-full bg-foreground"
+            animate={{ width: `${Math.min(100, progress * 100)}%` }}
+            transition={{ ease: "linear", duration: 0.4 }}
           />
         </div>
         <div className="mt-1 flex justify-between text-[10px] tabular-nums opacity-60">
@@ -101,36 +102,53 @@ export function NowPlayingWidget(props: WidgetProps) {
         </div>
       </div>
 
-      {/* transport — liquid glass */}
+      {/* transport — liquid glass, spring-tactile */}
       <div className="mt-3 flex items-center justify-center gap-3">
-        <LiquidButton
-          size="icon"
-          aria-label="Previous track"
-          onClick={onPrev}
-          className="size-11 rounded-full"
-        >
-          <SkipBackIcon className="size-5" />
-        </LiquidButton>
-        <LiquidButton
-          size="icon"
-          aria-label={isPlaying ? "Pause" : "Play"}
-          onClick={onToggle}
-          className="size-16 rounded-full"
-        >
-          {isPlaying ? (
-            <PauseIcon className="size-7" />
-          ) : (
-            <PlayIcon className="size-7 translate-x-[1px]" />
-          )}
-        </LiquidButton>
-        <LiquidButton
-          size="icon"
-          aria-label="Next track"
-          onClick={onNext}
-          className="size-11 rounded-full"
-        >
-          <SkipForwardIcon className="size-5" />
-        </LiquidButton>
+        <Tap>
+          <LiquidButton
+            size="icon"
+            aria-label="Previous track"
+            onClick={onPrev}
+            className="size-11 rounded-full"
+          >
+            <SkipBackIcon className="size-5" />
+          </LiquidButton>
+        </Tap>
+        <Tap>
+          <LiquidButton
+            size="icon"
+            aria-label={isPlaying ? "Pause" : "Play"}
+            onClick={onToggle}
+            className="size-16 rounded-full"
+          >
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.span
+                key={isPlaying ? "pause" : "play"}
+                initial={{ opacity: 0, scale: 0.5, rotate: -45 }}
+                animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                exit={{ opacity: 0, scale: 0.5, rotate: 45 }}
+                transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                className="grid place-items-center"
+              >
+                {isPlaying ? (
+                  <PauseIcon className="size-7" />
+                ) : (
+                  <PlayIcon className="size-7 translate-x-[1px]" />
+                )}
+              </motion.span>
+            </AnimatePresence>
+          </LiquidButton>
+        </Tap>
+        <Tap>
+          <LiquidButton
+            size="icon"
+            aria-label="Next track"
+            onClick={onNext}
+            className="size-11 rounded-full"
+          >
+            <SkipForwardIcon className="size-5" />
+          </LiquidButton>
+        </Tap>
       </div>
 
       {/* options */}
@@ -139,13 +157,10 @@ export function NowPlayingWidget(props: WidgetProps) {
           <QuoteIcon className="size-4" />
           Lyrics
         </Pill>
-
         <Pill onClick={onToggleTheme} aria-label="Toggle day or night mode">
           {theme === "dark" ? <MoonIcon className="size-4" /> : <SunIcon className="size-4" />}
           {theme === "dark" ? "Night" : "Day"}
         </Pill>
-
-        {/* lyric size */}
         <div className="flex items-center gap-0.5 rounded-full border border-border bg-card/60 px-1 py-1">
           <IconBtn onClick={() => onLyricSize(-1)} aria-label="Smaller lyrics">
             <span className="text-xs font-bold">A−</span>
@@ -154,12 +169,10 @@ export function NowPlayingWidget(props: WidgetProps) {
             <span className="text-base font-bold">A+</span>
           </IconBtn>
         </div>
-
         <Pill onClick={onOpenSettings} aria-label="Wallpaper settings">
           <SlidersIcon className="size-4" />
           Wallpaper
         </Pill>
-
         <Pill onClick={onOpenLibrary} aria-label="Open art library">
           <GridIcon className="size-4" />
           Library
@@ -169,14 +182,24 @@ export function NowPlayingWidget(props: WidgetProps) {
   )
 }
 
+function Tap({ children }: { children: ReactNode }) {
+  return (
+    <motion.div whileTap={{ scale: 0.88 }} transition={press} className="inline-flex">
+      {children}
+    </motion.div>
+  )
+}
+
 function Pill({
   active,
   children,
   ...rest
 }: { active?: boolean } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <button
-      {...rest}
+    <motion.button
+      {...(rest as React.ComponentProps<typeof motion.button>)}
+      whileTap={{ scale: 0.93 }}
+      transition={press}
       aria-pressed={active}
       className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
         active
@@ -185,7 +208,7 @@ function Pill({
       }`}
     >
       {children}
-    </button>
+    </motion.button>
   )
 }
 
@@ -194,12 +217,14 @@ function IconBtn({
   ...rest
 }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <button
-      {...rest}
+    <motion.button
+      {...(rest as React.ComponentProps<typeof motion.button>)}
+      whileTap={{ scale: 0.85 }}
+      transition={press}
       className="grid size-7 cursor-pointer place-items-center rounded-full text-foreground outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
     >
       {children}
-    </button>
+    </motion.button>
   )
 }
 

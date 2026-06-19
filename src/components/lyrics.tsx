@@ -1,5 +1,6 @@
 "use client"
 
+import { motion } from "motion/react"
 import { useEffect, useRef, useState } from "react"
 import { activeIndex, type LyricLine } from "@/lib/lyrics"
 
@@ -97,12 +98,10 @@ export function Lyrics({
           "linear-gradient(to bottom, transparent, #000 16%, #000 80%, transparent)",
       }}
     >
-      <div
+      <motion.div
         ref={innerRef}
-        style={{
-          transform: `translateY(${offset}px)`,
-          transition: "transform 0.7s cubic-bezier(0.22,1,0.36,1)",
-        }}
+        animate={{ y: offset }}
+        transition={{ type: "spring", stiffness: 130, damping: 26, mass: 0.6 }}
       >
         {lines.map((line, i) => {
           const isActive = i === active
@@ -129,7 +128,7 @@ export function Lyrics({
             </button>
           )
         })}
-      </div>
+      </motion.div>
     </div>
   )
 }
