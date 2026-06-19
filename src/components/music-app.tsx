@@ -45,6 +45,7 @@ export function MusicApp() {
   const [index, setIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
   const [progress, setProgress] = useState(0)
+  const [direction, setDirection] = useState(1)
 
   // native live state
   const [live, setLive] = useState<Playback | null>(null)
@@ -199,6 +200,7 @@ export function MusicApp() {
     setIsPlaying((p) => !p)
   }
   const next = () => {
+    setDirection(1)
     if (useLive) {
       NativeWallpaper.mediaControl({ action: "next" }).catch(() => {})
       return
@@ -207,6 +209,7 @@ export function MusicApp() {
     setProgress(0)
   }
   const prev = () => {
+    setDirection(-1)
     if (useLive) {
       NativeWallpaper.mediaControl({ action: "prev" }).catch(() => {})
       return
@@ -216,6 +219,7 @@ export function MusicApp() {
   }
 
   const pickTrack = (i: number) => {
+    setDirection(i >= index ? 1 : -1)
     setIndex(i)
     setProgress(0)
     setPreferLive(false)
@@ -251,7 +255,12 @@ export function MusicApp() {
 
   return (
     <main className="fixed inset-0 overflow-hidden">
-      <Wallpaper id={view.id} spec={view.cover ?? demoTrack.cover} image={view.image} />
+      <Wallpaper
+        id={view.id}
+        spec={view.cover ?? demoTrack.cover}
+        image={view.image}
+        direction={direction}
+      />
       <div className="pointer-events-none absolute inset-0 z-[1]" style={{ background: scrim }} />
 
       <div className="relative z-10 mx-auto flex h-full w-full max-w-md flex-col px-5 pb-5 pt-3">
