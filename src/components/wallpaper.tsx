@@ -19,26 +19,22 @@ type LayerState = "enter" | "leave" | "static"
 let counter = 0
 
 /**
- * Full-screen wallpaper with a lively directional transition.
+ * Full-screen wallpaper with a blended cross-dissolve.
  *
- * The incoming cover slides in from the side you're heading (right for next,
- * left for previous), zooming down from a slight over-scale with a quick blur
- * bloom and a saturation/brightness pop. The outgoing cover drifts the other
- * way, scales up and dims — a parallax cross-dissolve that feels energetic but
- * still smooth. Reduced-motion users get a plain quick fade.
+ * Old and new covers occupy the exact same space and melt into each other —
+ * the incoming art fades up while easing down from a slight over-scale with a
+ * brief blur bloom; the outgoing art fades out while drifting up in scale and
+ * softening. No sliding panels: the two images genuinely blend in place.
  */
 export function Wallpaper({
   id,
   spec,
   image,
-  direction = 1,
   className = "",
 }: {
   id: string
   spec?: CoverSpec
   image?: string
-  /** 1 = next (slide from right), -1 = previous (slide from left) */
-  direction?: number
   className?: string
 }) {
   const reduced = useReducedMotion()
@@ -49,7 +45,7 @@ export function Wallpaper({
     if (id === lastId.current) return
     lastId.current = id
     setLayers((prev) => [...prev, { key: counter++, spec, image }])
-    const t = setTimeout(() => setLayers((prev) => prev.slice(-1)), reduced ? 110 : 1050)
+    const t = setTimeout(() => setLayers((prev) => prev.slice(-1)), reduced ? 120 : 1050)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
@@ -70,7 +66,6 @@ export function Wallpaper({
             spec={layer.spec}
             image={layer.image}
             state={state}
-            dir={direction >= 0 ? 1 : -1}
             reduced={reduced}
           />
         )
@@ -83,9 +78,8 @@ function WallpaperLayer({
   spec,
   image,
   state,
-  dir,
   reduced,
-}: Source & { state: LayerState; dir: number; reduced: boolean }) {
+}: Source & { state: LayerState; reduced: boolean }) {
   const isEnter = state === "enter"
   const [armed, setArmed] = useState(!isEnter)
 
@@ -97,34 +91,34 @@ function WallpaperLayer({
 
   const REST = {
     opacity: 1,
-    transform: "translateX(0%) scale(1)",
+    transform: "scale(1)",
     filter: "blur(0px) saturate(1) brightness(1)",
   }
-  const OFFSCREEN = {
+  const ENTER_FROM = {
     opacity: 0,
-    transform: `translateX(${dir * 14}%) scale(1.14)`,
-    filter: "blur(12px) saturate(1.55) brightness(1.12)",
+    transform: "scale(1.07)",
+    filter: "blur(10px) saturate(1.35) brightness(1.08)",
   }
-  const DRIFTED = {
-    opacity: 1,
-    transform: `translateX(${-dir * 7}%) scale(1.08)`,
-    filter: "blur(3px) saturate(0.95) brightness(0.78)",
+  const LEAVE_TO = {
+    opacity: 0,
+    transform: "scale(1.05)",
+    filter: "blur(6px) saturate(1) brightness(0.9)",
   }
 
   let s: { opacity: number; transform?: string; filter?: string }
   if (reduced) {
-    s = { opacity: isEnter && !armed ? 0 : 1 }
+    s = { opacity: state === "leave" ? 0 : isEnter && !armed ? 0 : 1 }
   } else if (isEnter) {
-    s = armed ? REST : OFFSCREEN
+    s = armed ? REST : ENTER_FROM
   } else if (state === "leave") {
-    s = DRIFTED
+    s = LEAVE_TO
   } else {
     s = REST
   }
 
   const transition = reduced
-    ? "opacity 180ms linear"
-    : "opacity 650ms ease, transform 850ms cubic-bezier(0.16,1,0.3,1), filter 700ms ease"
+    ? "opacity 200ms linear"
+    : "opacity 900ms cubic-bezier(0.4,0,0.2,1), transform 1000ms cubic-bezier(0.22,1,0.36,1), filter 900ms ease"
 
   const style = { ...s, transition, willChange: "opacity, transform, filter" } as const
 
