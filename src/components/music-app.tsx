@@ -33,6 +33,7 @@ export function MusicApp() {
   const [lyricsOn, setLyricsOn] = useState(true)
   const [lyricSize, setLyricSize] = useState(1)
   const [clock, setClock] = useState("9:41")
+  const [dateStr, setDateStr] = useState("")
   const [native, setNative] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -67,9 +68,14 @@ export function MusicApp() {
     el.classList.toggle("dark", theme === "dark")
   }, [theme])
 
+  // Time/date are set only after mount so server-rendered HTML and the first
+  // client render are identical (avoids locale/timezone hydration mismatches).
   useEffect(() => {
-    const tick = () =>
-      setClock(new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))
+    const tick = () => {
+      const d = new Date()
+      setClock(d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))
+      setDateStr(d.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" }))
+    }
     tick()
     const id = setInterval(tick, 15_000)
     return () => clearInterval(id)
@@ -245,7 +251,7 @@ export function MusicApp() {
 
   return (
     <main className="fixed inset-0 overflow-hidden">
-      <Wallpaper id={view.id} spec={view.cover} image={view.image} />
+      <Wallpaper id={view.id} spec={view.cover ?? demoTrack.cover} image={view.image} />
       <div className="pointer-events-none absolute inset-0 z-[1]" style={{ background: scrim }} />
 
       <div className="relative z-10 mx-auto flex h-full w-full max-w-md flex-col px-5 pb-5 pt-3">
@@ -265,14 +271,10 @@ export function MusicApp() {
         {/* clock */}
         <div className="mt-2 text-center" style={{ color: onColor }}>
           <p
-            className="text-[11px] font-medium uppercase tracking-[0.2em]"
+            className="min-h-[1em] text-[11px] font-medium uppercase tracking-[0.2em]"
             style={{ color: subColor }}
           >
-            {new Date().toLocaleDateString([], {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-            })}
+            {dateStr}
           </p>
           <p className="font-light tabular-nums leading-none" style={{ fontSize: "clamp(3rem,15vw,4.5rem)" }}>
             {clock}
@@ -315,7 +317,7 @@ export function MusicApp() {
                 />
               ) : (
                 <CoverArt
-                  spec={view.cover!}
+                  spec={view.cover ?? demoTrack.cover}
                   className="aspect-square w-[78%] rounded-3xl shadow-2xl ring-1 ring-white/15"
                 />
               )}
@@ -327,7 +329,7 @@ export function MusicApp() {
         <NowPlayingWidget
           title={view.title}
           artist={view.artist}
-          cover={view.cover}
+          cover={view.cover ?? demoTrack.cover}
           image={view.image}
           isPlaying={view.isPlaying}
           progress={progressFrac}

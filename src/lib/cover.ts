@@ -59,6 +59,7 @@ function relLuminance(hex: string): number {
 
 /** Is this cover light overall? Used to pick a contrasting lyric color. */
 export function coverIsLight(spec: CoverSpec): boolean {
+  if (!spec || !spec.blobs) return false
   let sum = (relLuminance(spec.from) + relLuminance(spec.to)) * 0.6
   let weight = 1.2
   for (const b of spec.blobs) {
@@ -99,6 +100,7 @@ export function imageIsLight(url: string): Promise<boolean> {
 
 /** A CSS `background` value (layered radial gradients over a linear base). */
 export function coverBackground(spec: CoverSpec): string {
+  if (!spec || !spec.blobs) return "linear-gradient(160deg, #15152e, #0f0f23)"
   const layers = spec.blobs.map(
     (b) =>
       `radial-gradient(${b.r}% ${b.r}% at ${b.x}% ${b.y}%, ${rgba(

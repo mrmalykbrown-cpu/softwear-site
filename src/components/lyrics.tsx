@@ -43,6 +43,10 @@ export function Lyrics({
       setOffset(c.clientHeight / 2 - (el.offsetTop + el.offsetHeight / 2))
     }
     recenter()
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", recenter)
+      return () => window.removeEventListener("resize", recenter)
+    }
     const ro = new ResizeObserver(recenter)
     if (containerRef.current) ro.observe(containerRef.current)
     return () => ro.disconnect()
