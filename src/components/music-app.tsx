@@ -6,7 +6,14 @@ import { Lyrics } from "@/components/lyrics"
 import { NowPlayingWidget } from "@/components/now-playing-widget"
 import { TrackGallery } from "@/components/track-gallery"
 import { CoverArt } from "@/components/cover-art"
-import { CheckIcon, CloseIcon, DownloadIcon, SparkleIcon, WifiIcon } from "@/components/icons"
+import {
+  CheckIcon,
+  CloseIcon,
+  DownloadIcon,
+  QuoteIcon,
+  SparkleIcon,
+  WifiIcon,
+} from "@/components/icons"
 import { tracks } from "@/lib/tracks"
 import { coverIsLight, coverToDataUri, downloadCover, imageIsLight } from "@/lib/cover"
 import { fetchSyncedLyrics, type LyricLine } from "@/lib/lyrics"
@@ -274,7 +281,19 @@ export function MusicApp() {
 
         {/* center: lyrics or big art */}
         <div className="relative my-3 min-h-0 flex-1">
-          {lyricsOn ? (
+          {lyricsOn && native && !live?.access ? (
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="flex h-full w-full flex-col items-center justify-center gap-2 px-10 text-center"
+              style={{ color: onColor }}
+            >
+              <QuoteIcon className="size-8 opacity-80" />
+              <span className="text-lg font-semibold">Tap to enable lyrics</span>
+              <span className="text-sm opacity-70">
+                Grant Notification access to sync words from your music
+              </span>
+            </button>
+          ) : lyricsOn ? (
             <Lyrics
               lines={view.lines}
               positionSec={view.positionSec}
@@ -344,6 +363,35 @@ export function MusicApp() {
 
       {/* settings sheet */}
       <Sheet open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Wallpaper">
+        {native && !live?.access && (
+          <div className="mb-5 rounded-2xl border border-border bg-card p-4">
+            <p className="text-sm font-semibold text-foreground">
+              Enable lyrics &amp; now-playing
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Android needs Notification access to read the song and art from Spotify or
+              Apple Music.
+            </p>
+            <button
+              onClick={() => NativeWallpaper.openNotificationAccess()}
+              className="mt-3 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
+            >
+              Open notification access
+            </button>
+            <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+              Toggle greyed out? Because Prism was sideloaded, Samsung blocks it as a
+              &ldquo;restricted setting&rdquo;. Open{" "}
+              <b>Settings → Apps → Prism → ⋮ (top-right) → Allow restricted settings</b>,
+              then enable Prism under Notification access.
+            </p>
+          </div>
+        )}
+        {native && live?.access && (
+          <div className="mb-5 flex items-center gap-2 rounded-2xl border border-border bg-card p-3 text-sm text-foreground">
+            <CheckIcon className="size-4 text-[var(--play)]" />
+            Connected{live.app ? ` — ${sourceName(live.app)}` : ""}
+          </div>
+        )}
         <p className="mb-4 text-sm text-muted-foreground">
           {native
             ? useLive

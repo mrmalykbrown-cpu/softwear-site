@@ -52,23 +52,29 @@ public class NowPlayingListener extends NotificationListenerService
     @Override
     public void onActiveSessionsChanged(List<MediaController> controllers) {
         clearCallbacks();
-        if (controllers == null) return;
+        if (controllers == null) {
+            PrismWidget.requestUpdate(this);
+            return;
+        }
         for (final MediaController c : controllers) {
             MediaController.Callback cb = new MediaController.Callback() {
                 @Override
                 public void onMetadataChanged(MediaMetadata metadata) {
                     maybeApply(c);
+                    PrismWidget.requestUpdate(NowPlayingListener.this);
                 }
 
                 @Override
                 public void onPlaybackStateChanged(PlaybackState state) {
                     maybeApply(c);
+                    PrismWidget.requestUpdate(NowPlayingListener.this);
                 }
             };
             c.registerCallback(cb);
             callbacks.put(c, cb);
             maybeApply(c);
         }
+        PrismWidget.requestUpdate(this);
     }
 
     private void maybeApply(MediaController c) {

@@ -126,7 +126,7 @@ public class MediaArt {
         return md == null ? 0 : md.getLong(MediaMetadata.METADATA_KEY_DURATION);
     }
 
-    /** Compose a phone-sized wallpaper: soft-blurred zoomed art + centered crisp cover. */
+    /** Compose a full-screen wallpaper: album art filling the entire screen. */
     public static Bitmap buildWallpaper(Context ctx, Bitmap art) {
         int[] wh = screenSize(ctx);
         int w = wh[0], h = wh[1];
@@ -134,36 +134,28 @@ public class MediaArt {
         Canvas canvas = new Canvas(out);
         Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
 
-        // 1) cheap blur background: shrink hard, draw back up scaled to cover
-        Bitmap tiny = Bitmap.createScaledBitmap(art, 48, 48, true);
-        drawCover(canvas, tiny, w, h, paint);
+        // Album art fills the whole screen, edge to edge (center-crop cover).
+        drawCover(canvas, art, w, h, paint);
 
-        // 2) darken for depth / legibility
-        canvas.drawColor(Color.argb(150, 8, 8, 18));
+        // Subtle top + bottom scrims so status bar / clock stay legible.
+        Paint topScrim = new Paint();
+        topScrim.setShader(new LinearGradient(0, 0, 0, h * 0.22f,
+                Color.argb(90, 0, 0, 0), Color.TRANSPARENT, Shader.TileMode.CLAMP));
+        canvas.drawRect(0, 0, w, h * 0.22f, topScrim);
 
-        // 3) crisp album cover, centered, rounded
-        int target = (int) (w * 0.82f);
-        Bitmap square = centerCropSquare(art);
-        Bitmap scaled = Bitmap.createScaledBitmap(square, target, target, true);
-        float left = (w - target) / 2f;
-        float top = (h - target) / 2f;
-        float radius = target * 0.06f;
-
-        // drop shadow
-        Paint shadow = new Paint(Paint.ANTI_ALIAS_FLAG);
-        shadow.setColor(Color.argb(120, 0, 0, 0));
-        canvas.drawRoundRect(new RectF(left, top + 16, left + target, top + target + 16),
-                radius, radius, shadow);
-
-        canvas.drawBitmap(roundCorners(scaled, radius), left, top, paint);
-
-        // 4) bottom gradient scrim
-        Paint grad = new Paint();
-        grad.setShader(new LinearGradient(0, h * 0.55f, 0, h,
-                Color.TRANSPARENT, Color.argb(160, 0, 0, 0), Shader.TileMode.CLAMP));
-        canvas.drawRect(0, h * 0.55f, w, h, grad);
+        Paint bottomScrim = new Paint();
+        bottomScrim.setShader(new LinearGradient(0, h * 0.6f, 0, h,
+                Color.TRANSPARENT, Color.argb(120, 0, 0, 0), Shader.TileMode.CLAMP));
+        canvas.drawRect(0, h * 0.6f, w, h, bottomScrim);
 
         return out;
+    }
+
+    /** Square, scaled, rounded thumbnail for the home-screen widget. */
+    public static Bitmap roundedThumb(Bitmap art, int size, float radius) {
+        Bitmap sq = centerCropSquare(art);
+        Bitmap scaled = Bitmap.createScaledBitmap(sq, size, size, true);
+        return roundCorners(scaled, radius);
     }
 
     /** Apply a bitmap as wallpaper. target: "home" | "lock" | "both". */

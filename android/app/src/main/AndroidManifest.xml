@@ -45,6 +45,21 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- Home-screen widget: now-playing art + controls -->
+        <receiver
+            android:name=".PrismWidget"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.softwear.prism.WIDGET_PREV" />
+                <action android:name="com.softwear.prism.WIDGET_PLAYPAUSE" />
+                <action android:name="com.softwear.prism.WIDGET_NEXT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/prism_widget_info" />
+        </receiver>
     </application>
 
     <!-- Permissions -->

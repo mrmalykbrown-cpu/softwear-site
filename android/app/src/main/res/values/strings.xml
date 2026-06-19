@@ -4,4 +4,5 @@
     <string name="title_activity_main">Prism</string>
     <string name="package_name">com.softwear.prism</string>
     <string name="custom_url_scheme">com.softwear.prism</string>
+    <string name="widget_description">Now playing — album art &amp; controls</string>
 </resources>
