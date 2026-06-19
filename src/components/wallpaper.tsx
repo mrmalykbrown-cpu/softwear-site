@@ -19,12 +19,12 @@ type LayerState = "enter" | "leave" | "static"
 let counter = 0
 
 /**
- * Full-screen wallpaper with a blended cross-dissolve.
+ * Full-screen wallpaper transition.
  *
- * Old and new covers occupy the exact same space and melt into each other —
- * the incoming art fades up while easing down from a slight over-scale with a
- * brief blur bloom; the outgoing art fades out while drifting up in scale and
- * softening. No sliding panels: the two images genuinely blend in place.
+ * The KEY rule: the outgoing cover stays fully opaque underneath the whole
+ * time, so the page background is never visible — no black-out flash, ever.
+ * The incoming cover blooms in on top via an expanding circular reveal with a
+ * zoom-down and blur-to-sharp, so the change is vivid rather than a flat fade.
  */
 export function Wallpaper({
   id,
@@ -45,7 +45,8 @@ export function Wallpaper({
     if (id === lastId.current) return
     lastId.current = id
     setLayers((prev) => [...prev, { key: counter++, spec, image }])
-    const t = setTimeout(() => setLayers((prev) => prev.slice(-1)), reduced ? 120 : 1050)
+    // prune only AFTER the incoming layer fully covers the old one
+    const t = setTimeout(() => setLayers((prev) => prev.slice(-1)), reduced ? 260 : 1150)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
@@ -85,7 +86,7 @@ function WallpaperLayer({
 
   useEffect(() => {
     if (!isEnter) return
-    const r = requestAnimationFrame(() => setArmed(true))
+    const r = requestAnimationFrame(() => requestAnimationFrame(() => setArmed(true)))
     return () => cancelAnimationFrame(r)
   }, [isEnter])
 
@@ -93,21 +94,29 @@ function WallpaperLayer({
     opacity: 1,
     transform: "scale(1)",
     filter: "blur(0px) saturate(1) brightness(1)",
+    clipPath: "circle(150% at 50% 52%)",
   }
+  // incoming starts as a tiny, bright, zoomed, blurred seed and blooms outward
   const ENTER_FROM = {
-    opacity: 0,
-    transform: "scale(1.07)",
-    filter: "blur(10px) saturate(1.35) brightness(1.08)",
+    opacity: 1,
+    transform: "scale(1.18)",
+    filter: "blur(16px) saturate(1.5) brightness(1.18)",
+    clipPath: "circle(0% at 50% 52%)",
   }
+  // outgoing stays fully opaque (no black-out), just drifts back in scale
   const LEAVE_TO = {
-    opacity: 0,
-    transform: "scale(1.05)",
-    filter: "blur(6px) saturate(1) brightness(0.9)",
+    opacity: 1,
+    transform: "scale(1.07)",
+    filter: "blur(2px) saturate(1) brightness(0.92)",
+    clipPath: "circle(150% at 50% 52%)",
   }
 
-  let s: { opacity: number; transform?: string; filter?: string }
+  let s: typeof REST
   if (reduced) {
-    s = { opacity: state === "leave" ? 0 : isEnter && !armed ? 0 : 1 }
+    // simple opaque swap: old stays, new fades in quickly on top (still no black)
+    s = isEnter
+      ? { ...REST, opacity: armed ? 1 : 0 }
+      : REST
   } else if (isEnter) {
     s = armed ? REST : ENTER_FROM
   } else if (state === "leave") {
@@ -117,10 +126,10 @@ function WallpaperLayer({
   }
 
   const transition = reduced
-    ? "opacity 200ms linear"
-    : "opacity 900ms cubic-bezier(0.4,0,0.2,1), transform 1000ms cubic-bezier(0.22,1,0.36,1), filter 900ms ease"
+    ? "opacity 260ms ease"
+    : "transform 1100ms cubic-bezier(0.22,1,0.36,1), filter 850ms ease, clip-path 950ms cubic-bezier(0.22,1,0.36,1)"
 
-  const style = { ...s, transition, willChange: "opacity, transform, filter" } as const
+  const style = { ...s, transition, willChange: "transform, clip-path, filter" } as const
 
   if (image) {
     return (
