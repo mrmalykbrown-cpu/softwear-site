@@ -121,7 +121,7 @@ export function NowPlayingWidget(props: WidgetProps) {
             onClick={onToggle}
             className="size-16 rounded-full"
           >
-            <AnimatePresence mode="popLayout" initial={false}>
+            <AnimatePresence mode="wait" initial={false}>
               <motion.span
                 key={isPlaying ? "pause" : "play"}
                 initial={{ opacity: 0, scale: 0.5, rotate: -45 }}

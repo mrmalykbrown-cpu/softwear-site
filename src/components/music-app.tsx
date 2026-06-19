@@ -272,7 +272,12 @@ export function MusicApp() {
       />
       <div className="pointer-events-none absolute inset-0 z-[1]" style={{ background: scrim }} />
 
-      <div className="relative z-10 mx-auto flex h-full w-full max-w-md flex-col px-5 pb-5 pt-3">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 mx-auto flex h-full w-full max-w-md flex-col px-5 pb-5 pt-3"
+      >
         {/* status bar */}
         <div
           className="flex items-center justify-between text-[11px] font-semibold"
@@ -392,7 +397,7 @@ export function MusicApp() {
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenLibrary={() => setLibraryOpen(true)}
         />
-      </div>
+      </motion.div>
 
       {/* library sheet */}
       <Sheet open={libraryOpen} onClose={() => setLibraryOpen(false)} title="Art library">
