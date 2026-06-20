@@ -18,12 +18,17 @@ const HEIGHTS = Array.from({ length: N }, (_, i) => {
 export function WaveformScrubber({
   progress,
   onSeek,
+  playing = false,
+  bpm = 120,
 }: {
   progress: number
   onSeek?: (frac: number) => void
+  playing?: boolean
+  bpm?: number
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
+  const beatSec = Math.max(0.34, 60 / (bpm || 120))
 
   const seekAt = (clientX: number) => {
     const el = ref.current
@@ -38,6 +43,11 @@ export function WaveformScrubber({
       className={`flex h-9 items-center gap-[3px] ${
         onSeek ? "cursor-pointer touch-none" : ""
       }`}
+      style={
+        playing
+          ? { animation: `waveBeat ${beatSec}s ease-out infinite`, willChange: "filter" }
+          : undefined
+      }
       onPointerDown={(e) => {
         if (!onSeek) return
         dragging.current = true

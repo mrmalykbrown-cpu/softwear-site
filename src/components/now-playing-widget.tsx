@@ -27,6 +27,7 @@ interface WidgetProps {
   isPlaying: boolean
   progress: number
   durationSec: number
+  bpm: number
   lyricLine: string
   lyricsOn: boolean
   theme: "light" | "dark"
@@ -53,6 +54,7 @@ export function NowPlayingWidget(props: WidgetProps) {
     isPlaying,
     progress,
     durationSec,
+    bpm,
     lyricLine,
     lyricsOn,
     theme,
@@ -126,7 +128,7 @@ export function NowPlayingWidget(props: WidgetProps) {
 
         {/* waveform scrubber (the "time", slideable) */}
         <div className="mt-3">
-          <WaveformScrubber progress={progress} onSeek={onSeek} />
+          <WaveformScrubber progress={progress} onSeek={onSeek} playing={isPlaying} bpm={bpm} />
           <div className="mt-1 flex justify-between text-[10px] tabular-nums opacity-60">
             <span>{formatTime(elapsed)}</span>
             <span>-{formatTime(Math.max(0, durationSec - elapsed))}</span>

@@ -396,6 +396,7 @@ export function MusicApp() {
           isPlaying={view.isPlaying}
           progress={progressFrac}
           durationSec={view.durationSec}
+          bpm={view.bpm}
           lyricLine={currentLyric}
           onSeek={onScrub}
           lyricsOn={lyricsOn}
