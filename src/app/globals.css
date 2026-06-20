@@ -166,6 +166,37 @@ body {
   animation: eq 0.9s ease-in-out infinite;
 }
 
+/* Lyric glow pulsing to the beat: a bright attack that decays each beat. */
+@keyframes lyricBeatDark {
+  0% {
+    text-shadow:
+      0 2px 14px rgba(0, 0, 0, 0.4),
+      0 0 34px rgba(255, 255, 255, 0.95),
+      0 0 70px rgba(255, 255, 255, 0.6);
+  }
+  55%,
+  100% {
+    text-shadow:
+      0 2px 14px rgba(0, 0, 0, 0.4),
+      0 0 16px rgba(255, 255, 255, 0.35),
+      0 0 38px rgba(255, 255, 255, 0.15);
+  }
+}
+
+@keyframes lyricBeatLight {
+  0% {
+    text-shadow:
+      0 1px 10px rgba(255, 255, 255, 0.95),
+      0 0 28px rgba(255, 255, 255, 0.75);
+  }
+  55%,
+  100% {
+    text-shadow:
+      0 1px 10px rgba(255, 255, 255, 0.5),
+      0 0 14px rgba(255, 255, 255, 0.18);
+  }
+}
+
 /* Accessibility: honour reduced motion globally */
 @media (prefers-reduced-motion: reduce) {
   *,

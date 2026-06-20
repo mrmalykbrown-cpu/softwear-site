@@ -7,6 +7,8 @@ export interface Track {
   artist: string
   /** seconds */
   duration: number
+  /** beats per minute — drives the lyric beat-pulse */
+  bpm: number
   cover: CoverSpec
   /** bundled time-synced demo lyrics (original placeholder words) */
   lines: LyricLine[]
@@ -22,6 +24,7 @@ export const tracks: Track[] = [
     title: "Neon Sunset",
     artist: "Halcyon Drift",
     duration: 214,
+    bpm: 112,
     cover: {
       from: "#2b1055",
       to: "#7597de",
@@ -52,6 +55,7 @@ export const tracks: Track[] = [
     title: "Midnight City",
     artist: "Velour",
     duration: 248,
+    bpm: 104,
     cover: {
       from: "#020111",
       to: "#1b2a4a",
@@ -80,6 +84,7 @@ export const tracks: Track[] = [
     title: "Aurora",
     artist: "Northern Lights",
     duration: 196,
+    bpm: 92,
     cover: {
       from: "#021b1a",
       to: "#0a3d2e",
@@ -108,6 +113,7 @@ export const tracks: Track[] = [
     title: "Cosmic Bloom",
     artist: "Solene",
     duration: 263,
+    bpm: 120,
     cover: {
       from: "#0d0221",
       to: "#3a015c",
@@ -136,6 +142,7 @@ export const tracks: Track[] = [
     title: "Solar Flare",
     artist: "Kindred",
     duration: 231,
+    bpm: 128,
     cover: {
       from: "#3a0a02",
       to: "#7a1f05",
@@ -164,6 +171,7 @@ export const tracks: Track[] = [
     title: "Velvet Tide",
     artist: "Maren Vox",
     duration: 205,
+    bpm: 98,
     cover: {
       from: "#16021a",
       to: "#4a0e3a",

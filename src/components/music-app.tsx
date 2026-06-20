@@ -172,6 +172,7 @@ export function MusicApp() {
         lyricsLoading: liveLoading,
         lightWallpaper: liveLight,
         isPlaying: !!live.playing,
+        bpm: 120,
       }
     }
     return {
@@ -186,6 +187,7 @@ export function MusicApp() {
       lyricsLoading: false,
       lightWallpaper: coverIsLight(demoTrack.cover),
       isPlaying,
+      bpm: demoTrack.bpm,
     }
   }, [useLive, live, liveArt, liveLines, liveLoading, liveLight, demoTrack, progress, isPlaying])
 
@@ -330,6 +332,8 @@ export function MusicApp() {
               positionSec={view.positionSec}
               lightWallpaper={view.lightWallpaper}
               sizeScale={lyricSize}
+              playing={view.isPlaying}
+              bpm={view.bpm}
               loading={view.lyricsLoading}
               onSeek={
                 useLive ? undefined : (sec) => setProgress(clamp(sec / view.durationSec, 0, 1))

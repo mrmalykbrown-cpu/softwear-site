@@ -11,6 +11,10 @@ interface LyricsProps {
   lightWallpaper: boolean
   /** font multiplier (0.7 – 1.8) */
   sizeScale: number
+  /** whether playback is active (the glow only pulses while playing) */
+  playing?: boolean
+  /** tempo for the beat-pulse */
+  bpm?: number
   loading?: boolean
   onSeek?: (sec: number) => void
 }
@@ -25,9 +29,13 @@ export function Lyrics({
   positionSec,
   lightWallpaper,
   sizeScale,
+  playing = false,
+  bpm = 120,
   loading,
   onSeek,
 }: LyricsProps) {
+  const beatSec = Math.max(0.34, 60 / (bpm || 120))
+  const beatAnim = lightWallpaper ? "lyricBeatLight" : "lyricBeatDark"
   const containerRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
   const lineRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -117,7 +125,13 @@ export function Lyrics({
               className="block w-full cursor-pointer px-6 py-[0.35em] text-left font-extrabold leading-[1.12] tracking-[-0.02em] outline-none"
               style={{
                 color: isActive ? textActive : textIdle,
-                textShadow: isActive ? shadow : "none",
+                // while playing, the glow pulses to the beat (keyframes drive the
+                // text-shadow); paused shows a steady glow; idle lines none
+                textShadow: isActive && !playing ? shadow : isActive ? undefined : "none",
+                animation:
+                  isActive && playing
+                    ? `${beatAnim} ${beatSec}s ease-out infinite`
+                    : undefined,
                 transform: isActive ? "scale(1)" : "scale(0.97)",
                 transformOrigin: "left center",
                 filter: isActive ? "blur(0px)" : "blur(0.3px)",
