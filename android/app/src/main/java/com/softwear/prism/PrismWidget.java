@@ -74,7 +74,7 @@ public class PrismWidget extends AppWidgetProvider {
             rv.setImageViewResource(R.id.widget_art, R.drawable.ic_widget_art);
         }
 
-        rv.setTextViewText(R.id.widget_title, title);
+        rv.setTextViewText(R.id.widget_line, title);
         rv.setTextViewText(R.id.widget_artist, artist);
         rv.setImageViewResource(
                 R.id.widget_play, playing ? R.drawable.ic_widget_pause : R.drawable.ic_widget_play);
@@ -88,8 +88,12 @@ public class PrismWidget extends AppWidgetProvider {
             PendingIntent openPi = PendingIntent.getActivity(
                     ctx, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             rv.setOnClickPendingIntent(R.id.widget_art, openPi);
-            rv.setOnClickPendingIntent(R.id.widget_title, openPi);
+            rv.setOnClickPendingIntent(R.id.widget_line, openPi);
             rv.setOnClickPendingIntent(R.id.widget_artist, openPi);
+            rv.setOnClickPendingIntent(R.id.widget_wave, openPi);
+            rv.setOnClickPendingIntent(R.id.widget_chip_lyrics, openPi);
+            rv.setOnClickPendingIntent(R.id.widget_chip_wall, openPi);
+            rv.setOnClickPendingIntent(R.id.widget_chip_lib, openPi);
         }
 
         mgr.updateAppWidget(id, rv);
