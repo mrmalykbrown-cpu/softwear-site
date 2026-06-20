@@ -179,6 +179,18 @@ public class WallpaperPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void seekTo(PluginCall call) {
+        double pos = call.getDouble("position", 0.0); // seconds
+        MediaController c = MediaArt.getActiveController(getContext());
+        if (c == null) {
+            call.reject("NO_SESSION");
+            return;
+        }
+        c.getTransportControls().seekTo((long) (pos * 1000));
+        call.resolve();
+    }
+
+    @PluginMethod
     public void setAutoApply(PluginCall call) {
         boolean enabled = Boolean.TRUE.equals(call.getBoolean("enabled", false));
         String target = call.getString("target", "both");

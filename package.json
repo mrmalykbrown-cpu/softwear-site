@@ -24,6 +24,7 @@
     "three": "^0.172.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^7.6.6",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^20.17.0",

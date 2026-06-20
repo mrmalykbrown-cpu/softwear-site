@@ -39,6 +39,8 @@ export interface WallpaperPlugin {
   mediaControl(opts: {
     action: "playpause" | "play" | "pause" | "next" | "prev"
   }): Promise<void>
+  /** Seek the active media session to a position (seconds). */
+  seekTo(opts: { position: number }): Promise<void>
   applyWallpaper(opts: { target: WallpaperTarget }): Promise<{
     applied: boolean
     target: string

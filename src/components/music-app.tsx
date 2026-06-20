@@ -18,7 +18,7 @@ import {
 } from "@/components/icons"
 import { tracks } from "@/lib/tracks"
 import { coverIsLight, coverToDataUri, downloadCover, imageIsLight } from "@/lib/cover"
-import { fetchSyncedLyrics, type LyricLine } from "@/lib/lyrics"
+import { activeIndex, fetchSyncedLyrics, type LyricLine } from "@/lib/lyrics"
 import {
   Wallpaper as NativeWallpaper,
   isNativeApp,
@@ -190,6 +190,12 @@ export function MusicApp() {
   }, [useLive, live, liveArt, liveLines, liveLoading, liveLight, demoTrack, progress, isPlaying])
 
   const progressFrac = view.durationSec ? clamp(view.positionSec / view.durationSec, 0, 1) : 0
+  const ai = activeIndex(view.lines, view.positionSec)
+  const currentLyric = ai >= 0 ? view.lines[ai]?.text ?? "" : ""
+  const onScrub = (frac: number) => {
+    if (useLive) NativeWallpaper.seekTo({ position: frac * (view.durationSec || 0) }).catch(() => {})
+    else setProgress(clamp(frac, 0, 1))
+  }
   const onColor = view.lightWallpaper ? "rgba(12,12,20,0.92)" : "rgba(255,255,255,0.95)"
   const subColor = view.lightWallpaper ? "rgba(12,12,20,0.6)" : "rgba(255,255,255,0.72)"
   const scrim = view.lightWallpaper
@@ -386,6 +392,8 @@ export function MusicApp() {
           isPlaying={view.isPlaying}
           progress={progressFrac}
           durationSec={view.durationSec}
+          lyricLine={currentLyric}
+          onSeek={onScrub}
           lyricsOn={lyricsOn}
           theme={theme}
           onToggle={togglePlay}
