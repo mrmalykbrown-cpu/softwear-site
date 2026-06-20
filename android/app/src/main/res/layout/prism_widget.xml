@@ -5,23 +5,9 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="18dp">
 
-    <!-- headline (track) — mirrors the in-app lyric/title line -->
-    <TextView
-        android:id="@+id/widget_line"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:gravity="center"
-        android:maxLines="1"
-        android:paddingBottom="12dp"
-        android:text="@string/app_name"
-        android:textColor="#FFFFFF"
-        android:textSize="15sp"
-        android:textStyle="bold" />
-
-    <!-- meta: art + artist + eq -->
+    <!-- meta: art + title/artist + eq -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -30,24 +16,41 @@
 
         <ImageView
             android:id="@+id/widget_art"
-            android:layout_width="52dp"
-            android:layout_height="52dp"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
             android:contentDescription="@string/app_name"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_widget_art" />
 
-        <TextView
-            android:id="@+id/widget_artist"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
+            android:orientation="vertical"
             android:paddingStart="12dp"
-            android:paddingEnd="8dp"
-            android:text="Tap to open"
-            android:textColor="#B8FFFFFF"
-            android:textSize="13sp" />
+            android:paddingEnd="8dp">
+
+            <TextView
+                android:id="@+id/widget_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/app_name"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_artist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Tap to open"
+                android:textColor="#B8FFFFFF"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <ImageView
             android:layout_width="22dp"
@@ -57,95 +60,90 @@
             android:src="@drawable/widget_eq" />
     </LinearLayout>
 
-    <!-- waveform (the "time") -->
-    <ImageView
-        android:id="@+id/widget_wave"
+    <!-- live synced lyric line -->
+    <TextView
+        android:id="@+id/widget_lyric"
         android:layout_width="match_parent"
-        android:layout_height="24dp"
-        android:layout_marginTop="12dp"
-        android:contentDescription="@null"
-        android:scaleType="fitXY"
-        android:src="@drawable/widget_wave" />
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="2"
+        android:minHeight="40dp"
+        android:text="♪"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <!-- interactive waveform: tap anywhere to seek -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="30dp"
+        android:layout_marginTop="12dp">
+
+        <ImageView
+            android:id="@+id/widget_wave"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@null"
+            android:scaleType="fitXY"
+            android:src="@drawable/widget_wave" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <View android:id="@+id/seg0" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            <View android:id="@+id/seg1" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            <View android:id="@+id/seg2" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            <View android:id="@+id/seg3" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            <View android:id="@+id/seg4" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            <View android:id="@+id/seg5" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            <View android:id="@+id/seg6" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            <View android:id="@+id/seg7" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            <View android:id="@+id/seg8" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            <View android:id="@+id/seg9" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            <View android:id="@+id/seg10" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            <View android:id="@+id/seg11" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+        </LinearLayout>
+    </FrameLayout>
 
     <!-- transport -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
+        android:layout_marginTop="16dp"
         android:gravity="center"
         android:orientation="horizontal">
 
         <ImageView
             android:id="@+id/widget_prev"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
             android:background="@drawable/widget_btn"
             android:contentDescription="Previous"
-            android:padding="11dp"
+            android:padding="12dp"
             android:src="@drawable/ic_widget_prev" />
 
         <ImageView
             android:id="@+id/widget_play"
-            android:layout_width="54dp"
-            android:layout_height="54dp"
-            android:layout_marginStart="18dp"
-            android:layout_marginEnd="18dp"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="20dp"
             android:background="@drawable/widget_btn"
             android:contentDescription="Play or pause"
-            android:padding="14dp"
+            android:padding="15dp"
             android:src="@drawable/ic_widget_play" />
 
         <ImageView
             android:id="@+id/widget_next"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
             android:background="@drawable/widget_btn"
             android:contentDescription="Next"
-            android:padding="11dp"
+            android:padding="12dp"
             android:src="@drawable/ic_widget_next" />
-    </LinearLayout>
-
-    <!-- chips -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
-        android:gravity="center"
-        android:orientation="horizontal">
-
-        <TextView
-            android:id="@+id/widget_chip_lyrics"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/widget_chip"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="7dp"
-            android:text="Lyrics"
-            android:textColor="#E6FFFFFF"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/widget_chip_wall"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/widget_chip"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="7dp"
-            android:text="Wallpaper"
-            android:textColor="#E6FFFFFF"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/widget_chip_lib"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/widget_chip"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="7dp"
-            android:text="Library"
-            android:textColor="#E6FFFFFF"
-            android:textSize="11sp" />
     </LinearLayout>
 </LinearLayout>

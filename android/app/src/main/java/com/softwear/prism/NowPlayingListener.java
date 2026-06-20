@@ -8,6 +8,8 @@ import android.media.MediaMetadata;
 import android.media.session.MediaController;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
+import android.os.Handler;
+import android.os.Looper;
 import android.service.notification.NotificationListenerService;
 
 import java.util.HashMap;
@@ -25,6 +27,34 @@ public class NowPlayingListener extends NotificationListenerService
     private MediaSessionManager msm;
     private final Map<MediaController, MediaController.Callback> callbacks = new HashMap<>();
     private String lastKey = null;
+
+    // Drives the widget's live lyric line while music plays.
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable tick = new Runnable() {
+        @Override
+        public void run() {
+            PrismWidget.tickLyric(NowPlayingListener.this);
+            if (MediaArt.isPlaying(MediaArt.getActiveController(NowPlayingListener.this))) {
+                handler.postDelayed(this, 1200);
+            }
+        }
+    };
+
+    private void syncLoop() {
+        handler.removeCallbacks(tick);
+        handler.post(tick);
+    }
+
+    private void fetchLyrics(MediaController c) {
+        if (c == null) return;
+        MediaMetadata md = c.getMetadata();
+        if (md == null) return;
+        Lyrics.fetchAsync(
+                this,
+                md.getString(MediaMetadata.METADATA_KEY_TITLE),
+                md.getString(MediaMetadata.METADATA_KEY_ARTIST),
+                md.getLong(MediaMetadata.METADATA_KEY_DURATION));
+    }
 
     @Override
     public void onListenerConnected() {
@@ -46,6 +76,7 @@ public class NowPlayingListener extends NotificationListenerService
             } catch (Exception ignored) {
             }
         }
+        handler.removeCallbacks(tick);
         clearCallbacks();
     }
 
@@ -61,13 +92,16 @@ public class NowPlayingListener extends NotificationListenerService
                 @Override
                 public void onMetadataChanged(MediaMetadata metadata) {
                     maybeApply(c);
+                    fetchLyrics(c);
                     PrismWidget.requestUpdate(NowPlayingListener.this);
+                    syncLoop();
                 }
 
                 @Override
                 public void onPlaybackStateChanged(PlaybackState state) {
                     maybeApply(c);
                     PrismWidget.requestUpdate(NowPlayingListener.this);
+                    syncLoop();
                 }
             };
             c.registerCallback(cb);
@@ -75,6 +109,8 @@ public class NowPlayingListener extends NotificationListenerService
             maybeApply(c);
         }
         PrismWidget.requestUpdate(this);
+        fetchLyrics(MediaArt.getActiveController(this));
+        syncLoop();
     }
 
     private void maybeApply(MediaController c) {
