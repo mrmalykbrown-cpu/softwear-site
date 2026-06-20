@@ -55,9 +55,10 @@ export function Lyrics({
 
   const textActive = lightWallpaper ? "rgba(12,12,20,0.96)" : "rgba(255,255,255,0.97)"
   const textIdle = lightWallpaper ? "rgba(12,12,20,0.32)" : "rgba(255,255,255,0.36)"
+  // luminous glow on the active line (halo in the text colour + a legibility drop)
   const shadow = lightWallpaper
-    ? "0 1px 16px rgba(255,255,255,0.35)"
-    : "0 2px 26px rgba(0,0,0,0.5)"
+    ? "0 1px 10px rgba(255,255,255,0.7), 0 0 22px rgba(0,0,0,0.18)"
+    : "0 2px 14px rgba(0,0,0,0.4), 0 0 24px rgba(255,255,255,0.55), 0 0 52px rgba(255,255,255,0.3)"
 
   if (loading) {
     return (
