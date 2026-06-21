@@ -1,13 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Frosted glass panel: lighter sheen at the top fading to a darker translucent
-     base, with a subtle rim — mirrors the in-app liquid-glass widget. -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <gradient
-        android:angle="270"
-        android:startColor="#3AFFFFFF"
-        android:centerColor="#C8141420"
-        android:endColor="#E60B0B12"
-        android:centerY="0.18" />
-    <corners android:radius="34dp" />
-    <stroke android:width="1dp" android:color="#33FFFFFF" />
-</shape>
+<!-- Coral "Recently Played" card: a dark rounded frame with a bright coral
+     inset, mirroring the reference design. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#2A0B0C" />
+            <corners android:radius="34dp" />
+        </shape>
+    </item>
+    <item
+        android:left="5dp"
+        android:top="5dp"
+        android:right="5dp"
+        android:bottom="5dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#FF6E73"
+                android:endColor="#FB4A52" />
+            <corners android:radius="29dp" />
+        </shape>
+    </item>
+</layer-list>
