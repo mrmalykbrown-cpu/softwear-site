@@ -420,7 +420,7 @@ export function MusicApp() {
               setPreferLive(true)
               setLibraryOpen(false)
             }}
-            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
+            className="mb-5 flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-transform duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-[0.98]"
           >
             <SparkleIcon className="size-4" /> Sync with my music
           </button>
@@ -441,7 +441,7 @@ export function MusicApp() {
             </p>
             <button
               onClick={() => NativeWallpaper.openNotificationAccess()}
-              className="mt-3 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
+              className="mt-3 min-h-11 w-full rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-transform duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-[0.98]"
             >
               Open notification access
             </button>
@@ -472,16 +472,16 @@ export function MusicApp() {
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Apply to
             </p>
-            <div className="mb-4 grid grid-cols-3 gap-2">
+            <div className="mb-5 grid grid-cols-3 gap-1 rounded-full bg-muted p-1">
               {(["home", "lock", "both"] as WallpaperTarget[]).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTarget(t)}
                   aria-pressed={target === t}
-                  className={`rounded-xl border px-3 py-2 text-sm font-medium capitalize transition-colors ${
+                  className={`min-h-10 rounded-full px-3 py-2 text-sm font-medium capitalize transition-colors duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] ${
                     target === t
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-card text-foreground hover:bg-accent"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {t}
@@ -493,7 +493,7 @@ export function MusicApp() {
 
         <button
           onClick={setWallpaperNow}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 py-3.5 text-sm font-semibold text-primary-foreground transition-transform duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-[0.98]"
         >
           {applied ? <CheckIcon className="size-4" /> : <DownloadIcon className="size-4" />}
           {applied ? "Done" : native ? "Set wallpaper now" : "Download wallpaper"}
@@ -551,29 +551,33 @@ function Sheet({
       <div
         onClick={onClose}
         aria-hidden
-        className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 ${
+        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] ${
           open ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       />
       <div
         role="dialog"
         aria-label={title}
-        className={`glass fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[80vh] w-full max-w-md overflow-y-auto rounded-t-3xl p-5 pb-8 transition-transform duration-300 ${
+        className={`glass fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[80vh] w-full max-w-md overflow-y-auto rounded-t-3xl p-6 pb-8 transition-transform duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] ${
           open ? "translate-y-0" : "translate-y-full"
         }`}
       >
-        <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-foreground/25" />
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-display text-xl text-foreground">{title}</h2>
+        <div className="mx-auto mb-5 h-1.5 w-10 rounded-full bg-foreground/25" />
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground">
+            {title}
+          </h2>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="grid size-8 place-items-center rounded-full text-foreground transition-colors hover:bg-accent"
+            className="-mr-1.5 grid size-11 place-items-center rounded-full text-foreground transition-colors hover:bg-accent"
           >
             <CloseIcon className="size-5" />
           </button>
         </div>
-        {children}
+        <div key={open ? "open" : "closed"} className={open ? "animate-fade-up" : ""}>
+          {children}
+        </div>
       </div>
     </>
   )

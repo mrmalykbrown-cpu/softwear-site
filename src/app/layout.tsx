@@ -1,18 +1,13 @@
 import type { Metadata, Viewport } from "next"
-import { Inter, Poppins, Righteous } from "next/font/google"
+import { Inter, Poppins } from "next/font/google"
 import "./globals.css"
 
+// Poppins is only a graceful fallback — the UI leads with the platform
+// system font (SF Pro on Apple) per the apple-ui-design system.
 const poppins = Poppins({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
   variable: "--font-poppins",
-  display: "swap",
-})
-
-const righteous = Righteous({
-  subsets: ["latin"],
-  weight: ["400"],
-  variable: "--font-righteous",
   display: "swap",
 })
 
@@ -44,7 +39,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${poppins.variable} ${righteous.variable} ${inter.variable}`}
+      className={`dark ${poppins.variable} ${inter.variable}`}
     >
       <body className="antialiased">{children}</body>
     </html>

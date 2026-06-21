@@ -225,7 +225,7 @@ function Pill({
       whileTap={{ scale: 0.93 }}
       transition={press}
       aria-pressed={active}
-      className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium outline-none backdrop-blur-md transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
+      className={`flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-medium outline-none backdrop-blur-md transition-colors duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] focus-visible:ring-2 focus-visible:ring-ring ${
         active
           ? "border-primary bg-primary text-primary-foreground"
           : "border-foreground/15 bg-foreground/5 text-foreground hover:bg-foreground/15"
@@ -245,7 +245,7 @@ function IconBtn({
       {...(rest as React.ComponentProps<typeof motion.button>)}
       whileTap={{ scale: 0.85 }}
       transition={press}
-      className="grid size-7 cursor-pointer place-items-center rounded-full text-foreground outline-none transition-colors hover:bg-foreground/15 focus-visible:ring-2 focus-visible:ring-ring"
+      className="grid size-9 cursor-pointer place-items-center rounded-full text-foreground outline-none transition-colors duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:bg-foreground/15 focus-visible:ring-2 focus-visible:ring-ring"
     >
       {children}
     </motion.button>
