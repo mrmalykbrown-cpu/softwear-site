@@ -6,6 +6,7 @@ import { Haptics, ImpactStyle } from "@capacitor/haptics"
 import { Wallpaper } from "@/components/wallpaper"
 import { Lyrics } from "@/components/lyrics"
 import { NowPlayingWidget } from "@/components/now-playing-widget"
+import { VoiceControl, type VoiceCommand } from "@/components/voice-control"
 import { TrackGallery } from "@/components/track-gallery"
 import { CoverArt } from "@/components/cover-art"
 import {
@@ -43,6 +44,7 @@ export function MusicApp() {
   const [native, setNative] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [voiceOpen, setVoiceOpen] = useState(false)
   const [applied, setApplied] = useState(false)
   const [target, setTarget] = useState<WallpaperTarget>("both")
   const [autoApply, setAutoApply] = useState(false)
@@ -233,6 +235,32 @@ export function MusicApp() {
     setProgress(0)
   }
 
+  // Map a recognized voice command onto the existing playback handlers.
+  const handleVoice = (cmd: VoiceCommand) => {
+    switch (cmd) {
+      case "next":
+        next()
+        break
+      case "prev":
+        prev()
+        break
+      case "play":
+        if (!view.isPlaying) togglePlay()
+        break
+      case "pause":
+        if (view.isPlaying) togglePlay()
+        break
+      case "lyrics":
+        haptic()
+        setLyricsOn((v) => !v)
+        break
+      case "theme":
+        haptic()
+        setTheme((t) => (t === "dark" ? "light" : "dark"))
+        break
+    }
+  }
+
   const pickTrack = (i: number) => {
     haptic()
     setIndex(i)
@@ -409,6 +437,7 @@ export function MusicApp() {
           onLyricSize={(d) => setLyricSize((s) => clamp(s + d * 0.12, 0.7, 1.8))}
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenLibrary={() => setLibraryOpen(true)}
+          onOpenVoice={() => setVoiceOpen(true)}
         />
       </motion.div>
 
@@ -517,6 +546,13 @@ export function MusicApp() {
           </button>
         )}
       </Sheet>
+
+      {/* voice control overlay — built on the AIVoiceInput component */}
+      <VoiceControl
+        open={voiceOpen}
+        onClose={() => setVoiceOpen(false)}
+        onCommand={handleVoice}
+      />
 
       {/* toast */}
       <div

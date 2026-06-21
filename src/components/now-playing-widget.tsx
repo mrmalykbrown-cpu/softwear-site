@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react"
 import type { ReactNode } from "react"
+import { Mic } from "lucide-react"
 import { LiquidButton } from "@/components/ui/liquid-glass-button"
 import { CoverArt } from "@/components/cover-art"
 import { WaveformScrubber } from "@/components/waveform-scrubber"
@@ -40,6 +41,7 @@ interface WidgetProps {
   onLyricSize: (delta: number) => void
   onOpenSettings: () => void
   onOpenLibrary: () => void
+  onOpenVoice: () => void
 }
 
 const press = { type: "spring" as const, stiffness: 520, damping: 30 }
@@ -67,6 +69,7 @@ export function NowPlayingWidget(props: WidgetProps) {
     onLyricSize,
     onOpenSettings,
     onOpenLibrary,
+    onOpenVoice,
   } = props
   const elapsed = Math.round(progress * durationSec)
 
@@ -176,6 +179,10 @@ export function NowPlayingWidget(props: WidgetProps) {
 
         {/* options */}
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          <Pill onClick={onOpenVoice} aria-label="Voice control">
+            <Mic className="size-4" />
+            Voice
+          </Pill>
           <Pill active={lyricsOn} onClick={onToggleLyrics} aria-label="Toggle lyrics">
             <QuoteIcon className="size-4" />
             Lyrics
