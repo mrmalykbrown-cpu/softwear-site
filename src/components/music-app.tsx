@@ -7,6 +7,7 @@ import { Wallpaper } from "@/components/wallpaper"
 import { Lyrics } from "@/components/lyrics"
 import { NowPlayingWidget } from "@/components/now-playing-widget"
 import { VoiceControl, type VoiceCommand } from "@/components/voice-control"
+import { WindowControls } from "@/components/window-controls"
 import { TrackGallery } from "@/components/track-gallery"
 import { CoverArt } from "@/components/cover-art"
 import {
@@ -22,6 +23,7 @@ import { coverIsLight, coverToDataUri, downloadCover, imageIsLight } from "@/lib
 import { activeIndex, fetchSyncedLyrics, type LyricLine } from "@/lib/lyrics"
 import {
   Wallpaper as NativeWallpaper,
+  isElectron,
   isNativeApp,
   sourceName,
   type Playback,
@@ -299,6 +301,7 @@ export function MusicApp() {
 
   return (
     <main className="fixed inset-0 overflow-hidden">
+      <WindowControls />
       <Wallpaper
         id={view.id}
         spec={view.cover ?? demoTrack.cover}
@@ -496,7 +499,7 @@ export function MusicApp() {
             : "Exports the artwork as a phone-resolution image (open it as an APK to set it directly)."}
         </p>
 
-        {native && (
+        {native && !isElectron() && (
           <>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Apply to

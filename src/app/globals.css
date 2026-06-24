@@ -233,6 +233,14 @@ body {
   }
 }
 
+/* Electron frameless window: draggable chrome regions. */
+.drag-region {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
 /* Accessibility: honour reduced motion globally */
 @media (prefers-reduced-motion: reduce) {
   *,

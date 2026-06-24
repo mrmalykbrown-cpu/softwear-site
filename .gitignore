@@ -11,6 +11,9 @@ next-env.d.ts
 # production
 /build
 
+# electron (Windows) packaged output
+/dist-win
+
 # misc
 .DS_Store
 *.pem
