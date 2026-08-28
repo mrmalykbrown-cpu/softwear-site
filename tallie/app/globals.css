@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   Tallie design tokens.
+
+   This file is the only place a colour, radius or hairline is written down.
+   Every token below is mapped to a Tailwind utility in tailwind.config.ts,
+   and Tailwind's stock palette is switched off there — so a component that
+   wants a colour has to ask for one of these by name. A hex literal in a
+   component is a bug, not a shortcut.
+   ========================================================================== */
+
+:root {
+  /* --- Colour ------------------------------------------------------------
+     Amber is the colour of "pay attention": the first-week offer mark and
+     budgets between 80% and 100%. It appears nowhere else, or it stops
+     meaning anything.                                                      */
+  --paper: #ffffff; /* page background (marketing) */
+  --canvas: #f5f8f6; /* app background */
+  --ink: #0f1f1a; /* body text */
+  --muted: #4e5d57; /* secondary text */
+  --faint: #8a9791; /* tertiary text, labels */
+  --pine: #0d5a42; /* primary */
+  --pine-deep: #073329; /* hover, dark panels */
+  --mint: #e4f2eb; /* surface tint */
+  --amber: #b3650f; /* warnings and the offer mark ONLY */
+  --amber-bg: #fdf4e9;
+  --line: #e2e8e4; /* hairlines */
+
+  /* Over budget (>100%). NOT part of the supplied palette — placeholder,
+     pending the value from the prototype. Amber stays reserved for 80–100%,
+     so the "you have crossed the line" state needs a colour of its own.    */
+  --over: #8c1d18;
+  --over-bg: #fbedec;
+
+  /* Scrim behind the add sheet: --ink at 45%. */
+  --scrim: rgb(15 31 26 / 0.45);
+
+  /* --- Radius ------------------------------------------------------------
+     Three sizes, one per surface. Nothing else is rounded.                 */
+  --radius-button: 8px;
+  --radius-card: 12px; /* marketing cards */
+  --radius-card-app: 16px; /* app cards */
+
+  /* --- Hairlines and focus ---------------------------------------------- */
+  --hairline: 1px;
+  --focus-ring: var(--pine);
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* --- Motion ------------------------------------------------------------
+     Used by the tally tape and the add sheet. Both also honour
+     prefers-reduced-motion in JS; the block at the bottom is the backstop. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 140ms;
+  --duration-base: 240ms;
+}
+
+@layer base {
+  html {
+    /* Stop iOS inflating text in landscape; the layout is designed at the
+       size it is written. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-paper font-body text-ink antialiased;
+  }
+
+  /* Visible focus everywhere, in --pine. Any component that needs to remove
+     this outline must draw its own ring — never `outline: none` alone. */
+  :focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  ::selection {
+    @apply bg-mint text-ink;
+  }
+}
+
+/* Backstop for reduced motion. The tally tape and the add sheet check the
+   media query in JS as well, so under this setting the tape renders complete
+   and static rather than snapping through its animation in 0.01ms. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
