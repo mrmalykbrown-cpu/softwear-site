@@ -12,10 +12,13 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
+  // Runtime queries. On Supabase this is the transaction pooler (port 6543)
+  // with pgbouncer=true, because a transaction-mode pooler cannot hold the
+  // prepared statements Prisma would otherwise use.
   url       = env("DATABASE_URL")
-  // Neon and Supabase hand you a pooled (pgbouncer) URL that cannot run DDL.
-  // DIRECT_URL is the unpooled connection used for `migrate`. If your database
-  // has no pooler, set both variables to the same string.
+  // DDL. A transaction pooler cannot run migrations, so Prisma Migrate needs a
+  // session-mode connection: the same pooler host on port 5432. See
+  // .env.example for why this is not db.<ref>.supabase.co.
   directUrl = env("DIRECT_URL")
 }
 

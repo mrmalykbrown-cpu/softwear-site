@@ -45,8 +45,27 @@ Everything is documented inline in `.env.example`. The four you cannot run witho
 hides itself when `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are blank, so you can develop
 without it.
 
-`DIRECT_URL` exists because Neon and Supabase hand you a pooled connection that cannot run
-DDL. If your database has no pooler, set it to the same value as `DATABASE_URL`.
+`DIRECT_URL` exists because the pooled connection the app runs on cannot execute DDL.
+Prisma Migrate needs a session-mode connection; the app itself wants the transaction
+pooler.
+
+### Supabase
+
+Take both strings from **Project Settings -> Database -> Connection string -> Prisma**,
+which fills in your region and username. Prisma talks to Postgres directly — the project
+REST/PostgREST URL and the anon and service-role keys are not used anywhere in this
+codebase, and `supabase-js` is not a dependency.
+
+```
+DATABASE_URL  transaction pooler, port 6543, ?pgbouncer=true&connection_limit=1
+DIRECT_URL    session pooler,     port 5432
+```
+
+Point **both** at the `...pooler.supabase.com` host. Supabase's direct host,
+`db.<project-ref>.supabase.co`, now resolves **IPv6-only**, and Vercel's functions are
+IPv4-only — a `DIRECT_URL` aimed there fails every migration with "Can't reach database
+server" even though the credentials are perfect. Use it only on a network you know has
+IPv6.
 
 ### Scripts
 
