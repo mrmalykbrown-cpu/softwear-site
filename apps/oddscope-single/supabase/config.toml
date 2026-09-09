@@ -1,0 +1,10 @@
+project_id = "oddscope"
+
+[functions.analyze]
+# The caller must present a valid Supabase session; identity comes from the
+# verified token, not from anything in the request body.
+verify_jwt = true
+
+[functions.whop-webhook]
+# Whop authenticates with an HMAC signature, not a Supabase session.
+verify_jwt = false

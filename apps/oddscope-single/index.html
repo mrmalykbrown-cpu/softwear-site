@@ -1,0 +1,2515 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0D1524">
+<title>OddScope — See the math before you stake</title>
+<meta name="description" content="Screenshot a bookmaker's odds board and get three bets ranked by risk, each with its edge, its stake and its reasoning — and an honest answer when there is no bet worth making.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cg stroke='%23F1F5F9' stroke-width='3.5' stroke-linecap='round' fill='none'%3E%3Ccircle cx='24' cy='24' r='16.5'/%3E%3Cpath d='M24 2.5v6M24 39.5v6M2.5 24h6M39.5 24h6'/%3E%3C/g%3E%3Cg fill='%232563EB'%3E%3Crect x='14' y='25' width='5' height='9' rx='1.4'/%3E%3Crect x='21.5' y='16' width='5' height='18' rx='1.4'/%3E%3Crect x='29' y='20.5' width='5' height='13.5' rx='1.4'/%3E%3C/g%3E%3C/svg%3E">
+
+<style>
+/* ===========================================================================
+   OddScope design tokens.
+
+   The product is an instrument, not a casino. Depth comes from background
+   lightness rather than shadow, every number is monospaced and tabular so
+   columns never shift width, and the crosshair ring is the only decorative
+   motif — it appears as the loading indicator and the empty state, nowhere
+   else.
+   ======================================================================== */
+:root {
+  --navy-950: #0D1524;
+  --navy-900: #16233A;
+  --navy-800: #1F3050;
+  --blue-500: #2563EB;
+  --blue-400: #3B82F6;
+  --slate-100: #F1F5F9;
+  --slate-400: #94A3B8;
+
+  --tier-safe: #38BDF8;
+  --tier-balanced: #F59E0B;
+  --tier-aggressive: #EF4444;
+  --positive: #22C55E;
+  --negative: #EF4444;
+  --muted: #64748B;
+
+  --sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+
+  /* 12 / 14 / 16 / 20 / 28 / 40 / 60 */
+  --t-xs: 12px; --t-sm: 14px; --t-base: 16px;
+  --t-lg: 20px; --t-xl: 28px; --t-2xl: 40px; --t-3xl: 60px;
+
+  --radius: 12px;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--navy-950);
+  color: var(--slate-100);
+  font-family: var(--sans);
+  font-size: var(--t-base);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+}
+
+h1, h2, h3, h4 { font-weight: 600; letter-spacing: -0.015em; margin: 0; line-height: 1.25; }
+h1 { font-size: var(--t-xl); }
+h2 { font-size: var(--t-lg); }
+h3 { font-size: var(--t-base); }
+p { margin: 0; }
+a { color: var(--blue-400); text-decoration: none; }
+a:hover { color: var(--blue-500); }
+
+/* Every number in this product is a reading from an instrument. Tabular
+   figures keep columns from shifting width as values change. */
+.tabular, input[type="number"], input[type="date"] {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+:focus-visible { outline: 2px solid var(--blue-400); outline-offset: 2px; border-radius: 4px; }
+::selection { background: var(--blue-500); color: var(--slate-100); }
+
+/* Body copy caps at 68 characters. */
+.measure { max-width: 68ch; }
+
+.wrap { width: 100%; max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+.wrap-narrow { max-width: 680px; }
+.wrap-mid { max-width: 900px; }
+
+.grow { flex: 1; }
+.muted { color: var(--slate-400); }
+.dim { color: var(--muted); }
+.pos { color: var(--positive); }
+.neg { color: var(--negative); }
+.small { font-size: var(--t-sm); }
+.xs { font-size: var(--t-xs); }
+.center { text-align: center; }
+.right { text-align: right; }
+.row { display: flex; align-items: center; gap: 12px; }
+.between { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.stack > * + * { margin-top: 16px; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+.hidden { display: none !important; }
+
+/* --- Surfaces -------------------------------------------------------------
+   12px radius, one-pixel border, never a drop shadow. A card sits on the page
+   by being lighter than it, not by floating above it. */
+.card {
+  background: var(--navy-900);
+  border: 1px solid var(--navy-800);
+  border-radius: var(--radius);
+}
+.card-pad { padding: 20px; }
+.card-head { padding: 16px 20px; border-bottom: 1px solid var(--navy-800); }
+
+/* --- Buttons — 48px minimum in the analysis flow, which is used one-handed
+   standing in front of a bookmaker's app. ---------------------------------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 0 18px;
+  font-family: var(--sans); font-size: var(--t-sm); font-weight: 500;
+  border-radius: 8px; border: 1px solid transparent; cursor: pointer;
+  transition: background-color .15s, border-color .15s, color .15s;
+  text-align: center;
+}
+.btn-lg { min-height: 48px; font-size: var(--t-base); padding: 0 24px; }
+.btn-block { width: 100%; }
+.btn-primary { background: var(--blue-500); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--blue-400); color: #fff; }
+.btn-secondary { background: var(--navy-900); color: var(--slate-100); border-color: var(--navy-800); }
+.btn-secondary:hover:not(:disabled) { border-color: var(--blue-400); color: var(--blue-400); }
+.btn-ghost { background: transparent; color: var(--slate-400); }
+.btn-ghost:hover:not(:disabled) { color: var(--slate-100); }
+.btn-won:hover:not(:disabled) { border-color: var(--positive); color: var(--positive); }
+.btn-lost:hover:not(:disabled) { border-color: var(--negative); color: var(--negative); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* --- Fields --------------------------------------------------------------- */
+label.field-label { display: block; font-size: var(--t-sm); font-weight: 500; color: var(--slate-400); margin-bottom: 8px; }
+.input, .select, .textarea {
+  width: 100%; min-height: 44px; padding: 10px 12px;
+  background: var(--navy-950); color: var(--slate-100);
+  border: 1px solid var(--navy-800); border-radius: 8px;
+  font-family: var(--sans); font-size: var(--t-base);
+}
+.textarea { min-height: 96px; resize: vertical; line-height: 1.6; }
+.input:focus, .select:focus, .textarea:focus { border-color: var(--blue-400); outline: none; }
+.input::placeholder, .textarea::placeholder { color: rgba(148,163,184,.6); }
+.note { font-size: var(--t-xs); color: var(--slate-400); margin-top: 6px; }
+.note-error { color: var(--negative); }
+
+/* --- Stat tiles ----------------------------------------------------------- */
+.tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+@media (min-width: 640px) { .tiles { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1024px) { .tiles { grid-template-columns: repeat(5, 1fr); } }
+.tile { background: var(--navy-900); border: 1px solid var(--navy-800); border-radius: var(--radius); padding: 14px 16px; }
+.tile-label { font-size: var(--t-xs); color: var(--slate-400); }
+.tile-value { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--t-lg); font-weight: 600; margin-top: 6px; }
+.tile-hint { font-size: var(--t-xs); color: var(--slate-400); margin-top: 4px; }
+
+/* --- Tier identity -------------------------------------------------------- */
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 8px; border-radius: 6px;
+  font-size: var(--t-xs); font-weight: 500; border: 1px solid;
+}
+.badge .dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+.tier-SAFE       { color: var(--tier-safe); border-color: color-mix(in srgb, var(--tier-safe) 40%, transparent); background: color-mix(in srgb, var(--tier-safe) 10%, transparent); }
+.tier-BALANCED   { color: var(--tier-balanced); border-color: color-mix(in srgb, var(--tier-balanced) 40%, transparent); background: color-mix(in srgb, var(--tier-balanced) 10%, transparent); }
+.tier-AGGRESSIVE { color: var(--tier-aggressive); border-color: color-mix(in srgb, var(--tier-aggressive) 40%, transparent); background: color-mix(in srgb, var(--tier-aggressive) 10%, transparent); }
+.tier-NONE       { color: var(--muted); border-color: var(--navy-800); background: rgba(31,48,80,.6); }
+
+.chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 4px;
+  font-family: var(--mono); font-size: var(--t-xs); font-weight: 500;
+  background: var(--navy-800);
+}
+.chip-won  { background: color-mix(in srgb, var(--positive) 15%, transparent); color: var(--positive); }
+.chip-lost { background: color-mix(in srgb, var(--negative) 15%, transparent); color: var(--negative); }
+.chip-void { color: var(--slate-400); }
+.chip-none { color: var(--muted); }
+
+/* --- Probability bars ----------------------------------------------------- */
+.bar-track { height: 6px; border-radius: 999px; background: var(--navy-800); overflow: hidden; margin-top: 4px; }
+.bar-fill { height: 100%; border-radius: 999px; }
+.bar-ours { background: var(--blue-400); }
+.bar-theirs { background: rgba(148,163,184,.5); }
+
+/* --- Tables --------------------------------------------------------------- */
+.table-scroll { overflow-x: auto; border: 1px solid var(--navy-800); border-radius: var(--radius); background: var(--navy-900); }
+table { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
+th { text-align: left; font-size: var(--t-xs); font-weight: 500; color: var(--slate-400); padding: 12px 16px; border-bottom: 1px solid var(--navy-800); white-space: nowrap; }
+td { padding: 12px 16px; border-bottom: 1px solid var(--navy-800); }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: rgba(31,48,80,.3); }
+
+/* --- Nav ------------------------------------------------------------------ */
+.appbar { border-bottom: 1px solid var(--navy-800); background: var(--navy-900); }
+.tabs { display: flex; gap: 4px; overflow-x: auto; }
+.tab {
+  display: flex; align-items: center; min-height: 48px; padding: 0 12px;
+  font-size: var(--t-sm); color: var(--slate-400);
+  border-bottom: 2px solid transparent; white-space: nowrap;
+}
+.tab:hover { color: var(--slate-100); }
+.tab[aria-current="page"] { color: var(--slate-100); border-bottom-color: var(--blue-500); }
+
+.sitebar { position: sticky; top: 0; z-index: 40; border-bottom: 1px solid var(--navy-800); background: rgba(13,21,36,.9); backdrop-filter: blur(8px); }
+/* The section links are in-page anchors, and on a phone the reader reaches
+   those sections by scrolling anyway. Hiding them keeps the header one row
+   instead of three. */
+@media (max-width: 860px) { .sitebar .section-links { display: none; } }
+
+/* --- Sections ------------------------------------------------------------- */
+.section { border-top: 1px solid var(--navy-800); padding: 64px 0; }
+.section:first-of-type { border-top: 0; }
+.grid-2 { display: grid; gap: 24px; }
+.grid-3 { display: grid; gap: 20px; }
+@media (min-width: 768px) { .grid-2 { grid-template-columns: 1fr 1fr; gap: 40px; } .grid-3 { grid-template-columns: repeat(3, 1fr); } }
+
+details > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center;
+  justify-content: space-between; gap: 16px; min-height: 48px;
+  font-weight: 500; color: var(--slate-100);
+}
+details > summary::-webkit-details-marker { display: none; }
+details > summary .caret { color: var(--slate-400); transition: transform .2s; }
+details[open] > summary .caret { transform: rotate(180deg); }
+.faq { border-top: 1px solid var(--navy-800); border-bottom: 1px solid var(--navy-800); }
+.faq details { border-bottom: 1px solid var(--navy-800); padding: 4px 0; }
+.faq details:last-child { border-bottom: 0; }
+
+/* --- The one orchestrated motion moment ----------------------------------
+   The three tier cards stagger in and the whole sequence is over in 400ms:
+   the third starts at 140ms and runs for 260ms. Nothing else animates on
+   reveal. ------------------------------------------------------------------ */
+@keyframes tier-reveal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.reveal { animation: tier-reveal 260ms cubic-bezier(.16,1,.3,1) both; }
+.reveal:nth-child(2) { animation-delay: 70ms; }
+.reveal:nth-child(3) { animation-delay: 140ms; }
+
+@keyframes crosshair-spin { to { transform: rotate(360deg); } }
+.spin { animation: crosshair-spin 2.4s linear infinite; transform-origin: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .spin { animation: none; }
+  *, *::before, *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important; scroll-behavior: auto !important;
+  }
+}
+
+/* --- Modal ---------------------------------------------------------------- */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 50; display: flex;
+  align-items: flex-end; justify-content: center; padding: 16px;
+  background: rgba(13,21,36,.8); backdrop-filter: blur(4px);
+}
+@media (min-width: 640px) { .modal-backdrop { align-items: center; } }
+.modal { width: 100%; max-width: 520px; }
+
+/* --- Upload zone ---------------------------------------------------------- */
+.dropzone { border: 1px dashed var(--navy-800); border-radius: var(--radius); background: var(--navy-900); transition: border-color .15s; }
+.dropzone.dragging { border-color: var(--blue-400); }
+.preview-img { display: block; max-height: 320px; width: auto; max-width: 100%; margin: 0 auto; border-radius: 8px; border: 1px solid var(--navy-800); }
+
+/* --- Progress list -------------------------------------------------------- */
+.steps { list-style: none; margin: 32px 0 0; padding: 0; width: 100%; max-width: 280px; }
+.steps li { display: flex; align-items: center; gap: 12px; margin-top: 12px; font-size: var(--t-sm); color: var(--navy-800); }
+.steps li:first-child { margin-top: 0; }
+.steps .marker { width: 20px; height: 20px; border-radius: 999px; border: 1px solid var(--navy-800); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.steps .marker span { width: 6px; height: 6px; border-radius: 999px; background: var(--navy-800); }
+.steps li.active { color: var(--slate-100); }
+.steps li.active .marker { border-color: var(--blue-400); }
+.steps li.active .marker span { background: var(--blue-400); }
+.steps li.done { color: var(--slate-400); }
+.steps li.done .marker { border-color: var(--positive); background: color-mix(in srgb, var(--positive) 15%, transparent); color: var(--positive); }
+
+/* --- Footer --------------------------------------------------------------- */
+footer { border-top: 1px solid var(--navy-800); margin-top: 64px; padding: 40px 0; }
+.footer-links { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: var(--t-sm); }
+.footer-links a { color: var(--slate-400); }
+.footer-links a:hover { color: var(--slate-100); }
+
+/* --- Banner --------------------------------------------------------------- */
+.banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: var(--navy-900); border: 1px solid var(--navy-800); border-radius: var(--radius); margin-bottom: 24px; }
+
+/* --- Toast ---------------------------------------------------------------- */
+#toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  z-index: 60; max-width: calc(100% - 32px);
+  padding: 12px 18px; border-radius: 8px; font-size: var(--t-sm);
+  background: var(--navy-900); border: 1px solid var(--navy-800); color: var(--slate-100);
+}
+#toast.error { border-color: var(--negative); color: var(--negative); }
+</style>
+</head>
+<body>
+<div id="app" class="grow"></div>
+<div id="modal-root"></div>
+<div id="toast" class="hidden" role="status" aria-live="polite"></div>
+
+<script type="module">
+/* ===========================================================================
+   supabase-js is loaded dynamically, from a primary CDN with a fallback.
+
+   A static import would take the whole module down with it: if the CDN is
+   blocked, throttled or simply down, the browser stops before a single line of
+   this file runs and the visitor gets a blank white page with no explanation.
+   A dynamic import can be caught, so a network problem produces a sentence
+   instead of silence.
+   ======================================================================== */
+const SUPABASE_CDNS = [
+  "https://esm.sh/@supabase/supabase-js@2.58.0",
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/+esm",
+];
+
+let createClient = null;
+for (const url of SUPABASE_CDNS) {
+  try {
+    ({ createClient } = await import(url));
+    break;
+  } catch {
+    // Try the next one; the last failure is reported below.
+  }
+}
+
+/* ===========================================================================
+   CONFIGURATION
+
+   The anon key belongs here. It is designed to be public — every table has
+   row-level security, and the policies in supabase/migrations/0001_init.sql
+   are what make it safe. It grants nothing on its own.
+
+   NEVER paste the service_role key into this file. That key bypasses RLS
+   entirely, and this file is served to anybody who opens the page.
+   ======================================================================== */
+const CONFIG = {
+  SUPABASE_URL: "https://fttdtvmfzaggfihieurr.supabase.co",
+  SUPABASE_ANON_KEY: "PASTE_YOUR_ANON_KEY_HERE",
+  // Supabase -> Project Settings -> API -> Project API keys -> anon / public
+
+  WHOP_CHECKOUT_URL: "https://whop.com",
+  WHOP_PORTAL_URL: "https://whop.com/orders",
+  PRICE_LABEL: "R147",
+};
+
+const ANALYZE_URL = `${CONFIG.SUPABASE_URL}/functions/v1/analyze`;
+const sb = createClient
+  ? createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY)
+  : null;
+
+/* ===========================================================================
+   The arithmetic.
+
+   Mirrors the database's generated columns exactly. The database is the
+   authority — these are for rendering values we have not round-tripped yet,
+   and for the worked examples on the landing page.
+   ======================================================================== */
+const KELLY_FRACTION = 0.25;
+const UNITS_PER_BANKROLL = 100;   // one unit is one percent of bankroll
+const MAX_STAKE_UNITS = 3;
+
+const impliedProbability = (odds) => (Number.isFinite(odds) && odds > 1 ? 1 / odds : 0);
+const edge = (p, odds) => (Number.isFinite(odds) && odds > 1 ? p * odds - 1 : -1);
+
+function quarterKellyUnits(p, odds) {
+  if (!Number.isFinite(odds) || odds <= 1) return 0;
+  const advantage = edge(p, odds);
+  if (advantage <= 0) return 0;
+  const fraction = (advantage / (odds - 1)) * KELLY_FRACTION;
+  return Math.min(Math.max(fraction * UNITS_PER_BANKROLL, 0), MAX_STAKE_UNITS);
+}
+
+/* ===========================================================================
+   Formatting. Fixed decimal places so values never change width between
+   renders, which is what makes a column of odds readable at a glance.
+   ======================================================================== */
+const CURRENCY_SYMBOLS = {
+  ZAR: "R", USD: "$", EUR: "€", GBP: "£", NGN: "₦",
+  KES: "KSh", GHS: "GH₵", AUD: "A$", CAD: "C$", INR: "₹",
+};
+const CURRENCIES = Object.keys(CURRENCY_SYMBOLS);
+const symbolFor = (code) => CURRENCY_SYMBOLS[code] ?? `${code} `;
+
+const num = (value) => {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const fmtOdds = (v) => (num(v) == null ? "—" : num(v).toFixed(2));
+const fmtPct = (v, dp = 1) => (num(v) == null ? "—" : `${(num(v) * 100).toFixed(dp)}%`);
+
+function fmtSignedPct(v, dp = 1) {
+  const value = num(v);
+  if (value == null) return "—";
+  const pct = value * 100;
+  const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
+  return `${sign}${Math.abs(pct).toFixed(dp)}%`;
+}
+
+function fmtUnits(v, dp = 2) {
+  const value = num(v);
+  if (value == null) return "—";
+  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  return `${sign}${Math.abs(value).toFixed(dp)}`;
+}
+
+/* Stake sizes are unsigned, and carry two decimals so that units x unit size
+   visibly equals the currency amount printed beside them. At one decimal,
+   1.57 units renders as "1.6 units (R15.71)" — a line that fails when you
+   check it, in a product whose whole argument is "check the arithmetic". */
+const fmtStake = (v) => (num(v) == null ? "—" : num(v).toFixed(2));
+
+function fmtMoney(v, currency = "ZAR") {
+  const value = num(v);
+  if (value == null) return "—";
+  const symbol = symbolFor(currency);
+  const abs = Math.abs(value);
+  const body = Number.isInteger(abs)
+    ? abs.toLocaleString("en-US")
+    : abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${value < 0 ? "−" : ""}${symbol}${body}`;
+}
+
+function fmtDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function fmtDateTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return `${fmtDate(date)}, ${date.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+}
+
+function daysRemaining(value) {
+  if (!value) return "—";
+  const ms = new Date(value).getTime() - Date.now();
+  if (ms <= 0) return "today";
+  const days = Math.ceil(ms / 86400000);
+  return days === 1 ? "1 day" : `${days} days`;
+}
+
+/** Escape everything interpolated into a template. Team names, market labels
+    and rationales all originate outside this app. */
+function esc(value) {
+  if (value == null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/* ===========================================================================
+   The crosshair. Loading indicator and empty-state icon, nowhere else — a
+   motif used everywhere stops being a motif.
+   ======================================================================== */
+function crosshair({ size = 48, color = "currentColor", spinning = false } = {}) {
+  return `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true" style="width:${size}px;height:${size}px;color:${color}">
+    <g class="${spinning ? "spin" : ""}" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+      <path d="M24 6.5a17.5 17.5 0 0 1 17.5 17.5" opacity=".9"/>
+      <path d="M41.5 24A17.5 17.5 0 0 1 24 41.5" opacity=".55"/>
+      <path d="M24 41.5A17.5 17.5 0 0 1 6.5 24" opacity=".35"/>
+      <path d="M6.5 24A17.5 17.5 0 0 1 24 6.5" opacity=".2"/>
+      <path d="M24 1.5v6M24 40.5v6M1.5 24h6M40.5 24h6"/>
+    </g></svg>`;
+}
+
+function logo() {
+  return `<span style="display:inline-flex;align-items:center;gap:10px">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" style="width:28px;height:28px;flex:0 0 auto">
+      <g stroke="var(--slate-100)" stroke-width="3.5" stroke-linecap="round">
+        <circle cx="24" cy="24" r="16.5"/>
+        <path d="M24 2.5v6M24 39.5v6M2.5 24h6M39.5 24h6"/>
+      </g>
+      <g fill="var(--blue-500)">
+        <rect x="14" y="25" width="5" height="9" rx="1.4"/>
+        <rect x="21.5" y="16" width="5" height="18" rx="1.4"/>
+        <rect x="29" y="20.5" width="5" height="13.5" rx="1.4"/>
+      </g></svg>
+    <span style="font-size:20px;font-weight:600;letter-spacing:-.02em">
+      <span style="color:var(--slate-100)">Odd</span><span style="color:var(--blue-500)">Scope</span>
+    </span></span>`;
+}
+
+const TIER_LABEL = { SAFE: "Safe", BALANCED: "Balanced", AGGRESSIVE: "Aggressive" };
+const TIER_ORDER = ["SAFE", "BALANCED", "AGGRESSIVE"];
+
+/* ===========================================================================
+   State and small helpers
+   ======================================================================== */
+const state = {
+  session: null,
+  profile: null,
+  booted: false,
+};
+
+let toastTimer;
+function toast(message, isError = false) {
+  const el = document.getElementById("toast");
+  el.textContent = message;
+  el.classList.toggle("error", isError);
+  el.classList.remove("hidden");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add("hidden"), 4200);
+}
+
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+
+function on(selector, event, handler, root = document) {
+  $$(selector, root).forEach((el) => el.addEventListener(event, handler));
+}
+
+const go = (hash) => { window.location.hash = hash; };
+
+/* ===========================================================================
+   Performance aggregation.
+
+   Two conventions, both standard and both deliberate: a void bet is settled
+   but excluded from strike rate and ROI, because a refund is not a result; and
+   ROI is profit over turnover, not over bankroll, so it survives a change in
+   stake sizing.
+   ======================================================================== */
+function summarize(rows) {
+  const decided = rows.filter((r) => r.outcome === "WON" || r.outcome === "LOST");
+  const won = decided.filter((r) => r.outcome === "WON").length;
+  const lost = decided.length - won;
+  const voided = rows.filter((r) => r.outcome === "VOID").length;
+  const pending = rows.filter((r) => r.outcome === "UNMARKED").length;
+
+  const unitsStaked = decided.reduce((sum, r) => sum + (num(r.stake_units) ?? 0), 0);
+  const netUnits = rows.reduce((sum, r) => sum + (num(r.profit_loss) ?? 0), 0);
+
+  const priced = decided.filter((r) => num(r.odds) != null);
+  const averageOdds = priced.length
+    ? priced.reduce((sum, r) => sum + num(r.odds), 0) / priced.length
+    : null;
+
+  return {
+    betsSettled: decided.length + voided,
+    won, lost, voided, pending,
+    strikeRate: decided.length ? won / decided.length : null,
+    roi: unitsStaked > 0 ? netUnits / unitsStaked : null,
+    netUnits, unitsStaked, averageOdds,
+    streak: currentStreak(rows),
+  };
+}
+
+/** Consecutive wins or losses ending at the most recently settled bet. */
+function currentStreak(rows) {
+  const decided = rows
+    .filter((r) => (r.outcome === "WON" || r.outcome === "LOST") && r.settled_at)
+    .sort((a, b) => new Date(b.settled_at) - new Date(a.settled_at));
+  if (!decided.length) return null;
+
+  const type = decided[0].outcome === "WON" ? "W" : "L";
+  let length = 0;
+  for (const row of decided) {
+    if ((row.outcome === "WON" ? "W" : "L") !== type) break;
+    length += 1;
+  }
+  return { type, length };
+}
+
+/** Every tier is returned even with no settled bets — an empty aggressive row
+    is itself information about how the account is being used. */
+function breakdownByTier(rows) {
+  return TIER_ORDER.map((tier) => ({ tier, ...summarize(rows.filter((r) => r.tier === tier)) }));
+}
+
+/** Running profit in units, starting at zero so the line has an origin. */
+function cumulativeUnits(rows) {
+  const settled = rows
+    .filter((r) => r.settled_at && r.outcome !== "UNMARKED")
+    .sort((a, b) => new Date(a.settled_at) - new Date(b.settled_at));
+  if (!settled.length) return [];
+
+  const points = [{ units: 0, label: "Start" }];
+  let running = 0;
+  for (const row of settled) {
+    running += num(row.profit_loss) ?? 0;
+    points.push({
+      units: Number(running.toFixed(2)),
+      label: new Date(row.settled_at).toLocaleDateString("en-ZA", { day: "2-digit", month: "short" }),
+    });
+  }
+  return points;
+}
+
+/* ===========================================================================
+   The cumulative-units chart, drawn as inline SVG.
+
+   No gridlines and no area fill: a single stroke against a zero line, because
+   the only question it answers is which side of zero the account is on and how
+   it got there.
+   ======================================================================== */
+function unitsChart(points) {
+  if (points.length < 2) {
+    return `<div class="center muted small" style="padding:64px 0">Mark a few bets and your curve will appear here.</div>`;
+  }
+
+  const W = 720, H = 220, PAD_L = 44, PAD_R = 12, PAD_T = 12, PAD_B = 28;
+  const values = points.map((p) => p.units);
+  let min = Math.min(0, ...values);
+  let max = Math.max(0, ...values);
+  if (min === max) { min -= 1; max += 1; }
+  const span = max - min;
+
+  const x = (i) => PAD_L + (i / (points.length - 1)) * (W - PAD_L - PAD_R);
+  const y = (v) => PAD_T + (1 - (v - min) / span) * (H - PAD_T - PAD_B);
+
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)} ${y(p.units).toFixed(1)}`).join(" ");
+  const zeroY = y(0).toFixed(1);
+
+  const ticks = [max, min + span / 2, min].map((v) =>
+    `<text x="${PAD_L - 8}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end"
+           font-family="var(--mono)" font-size="11" fill="var(--slate-400)">${v.toFixed(1)}</text>`).join("");
+
+  // Label roughly six points along the axis, however many there are.
+  const step = Math.max(1, Math.ceil(points.length / 6));
+  const labels = points.map((p, i) =>
+    i % step === 0 || i === points.length - 1
+      ? `<text x="${x(i).toFixed(1)}" y="${H - 8}" text-anchor="middle"
+              font-family="var(--mono)" font-size="11" fill="var(--slate-400)">${esc(p.label)}</text>`
+      : "").join("");
+
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cumulative profit in units over time"
+               style="width:100%;height:220px;display:block">
+    <line x1="${PAD_L}" x2="${W - PAD_R}" y1="${zeroY}" y2="${zeroY}" stroke="var(--navy-800)" stroke-width="1"/>
+    ${ticks}${labels}
+    <path d="${path}" fill="none" stroke="var(--blue-400)" stroke-width="2"
+          stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+/* ===========================================================================
+   Shared chrome
+   ======================================================================== */
+function siteFooter() {
+  return `<footer><div class="wrap">
+    <div class="between">
+      <a href="#/" aria-label="OddScope home">${logo()}</a>
+      <nav class="footer-links">
+        <a href="#/terms">Terms</a>
+        <a href="#/privacy">Privacy</a>
+        <a href="#/responsible">Responsible Gambling</a>
+        <a href="#/contact">Contact</a>
+      </nav>
+    </div>
+    <p class="measure xs muted" style="margin-top:28px">
+      18+. Betting carries a risk of financial loss. OddScope provides statistical
+      analysis, not guaranteed outcomes. Never stake money you cannot afford to lose.
+    </p>
+  </div></footer>`;
+}
+
+function appNav(active) {
+  const tabs = [
+    ["#/dashboard", "Dashboard"],
+    ["#/analyze", "Analyze"],
+    ["#/history", "History"],
+    ["#/settings", "Settings"],
+  ];
+  return `<header class="appbar">
+    <div class="wrap between" style="padding-top:12px;padding-bottom:12px">
+      <a href="#/dashboard" aria-label="OddScope dashboard">${logo()}</a>
+      <button class="btn btn-ghost" data-signout>Sign out</button>
+    </div>
+    <nav class="wrap"><div class="tabs">
+      ${tabs.map(([href, label]) => `
+        <a class="tab" href="${href}" ${href === active ? 'aria-current="page"' : ""}>${label}</a>`).join("")}
+    </div></nav>
+  </header>`;
+}
+
+function siteHeader() {
+  return `<header class="sitebar"><div class="wrap between" style="padding-top:14px;padding-bottom:14px">
+    <a href="#/" aria-label="OddScope home">${logo()}</a>
+    <nav class="row small section-links" style="gap:24px">
+      <a href="#how" class="muted">How it works</a>
+      <a href="#why" class="muted">Why it works</a>
+      <a href="#pricing" class="muted">Pricing</a>
+      <a href="#faq" class="muted">FAQ</a>
+    </nav>
+    <div class="row">
+      <a href="#/login" class="small muted">Log in</a>
+      <a href="#/signup" class="btn btn-primary">Start free trial</a>
+    </div>
+  </div></header>`;
+}
+
+function emptyState(title, body, action = "") {
+  return `<div class="card center" style="padding:56px 24px;display:flex;flex-direction:column;align-items:center">
+    ${crosshair({ size: 48, color: "var(--navy-800)" })}
+    <h3 style="margin-top:20px">${esc(title)}</h3>
+    ${body ? `<p class="measure muted small" style="margin-top:8px">${esc(body)}</p>` : ""}
+    ${action ? `<div style="margin-top:24px">${action}</div>` : ""}
+  </div>`;
+}
+
+function statTile(label, value, hint = "", tone = "") {
+  const color = tone === "pos" ? "var(--positive)"
+    : tone === "neg" ? "var(--negative)"
+    : tone === "dim" ? "var(--muted)"
+    : "var(--slate-100)";
+  return `<div class="tile">
+    <div class="tile-label">${esc(label)}</div>
+    <div class="tile-value" style="color:${color}">${esc(value)}</div>
+    ${hint ? `<div class="tile-hint">${esc(hint)}</div>` : ""}
+  </div>`;
+}
+
+const toneOf = (v) => (num(v) == null || num(v) === 0 ? "dim" : num(v) > 0 ? "pos" : "neg");
+
+/* ===========================================================================
+   The tier card — the centrepiece, shared by the landing sample and live
+   results.
+
+   The no-value case is not an error state and is not styled like one. It is
+   muted rather than alarming, because "skip this" is a legitimate answer and
+   the card that says so is often the most valuable one on the screen.
+   ======================================================================== */
+function tierCard(rec, { currency = "ZAR", reveal = false, controls = "" } = {}) {
+  const cls = `card card-pad ${reveal ? "reveal" : ""}`;
+
+  if (rec.no_value) {
+    return `<article class="${cls}" style="background:rgba(22,35,58,.6)">
+      <div class="between">
+        <span class="badge tier-NONE"><span class="dot"></span>${TIER_LABEL[rec.tier]}</span>
+        <span class="tabular xs dim">No value found</span>
+      </div>
+      <p class="measure small muted" style="margin-top:16px">
+        No value at these odds. The best available price in this range is shorter than
+        the true probability justifies. Skipping is the correct play here.
+      </p>
+    </article>`;
+  }
+
+  const edgeValue = num(rec.edge_percent) ?? 0;
+  const ours = num(rec.model_probability) ?? 0;
+  const theirs = num(rec.implied_probability) ?? impliedProbability(num(rec.odds));
+  const pct = (v) => Math.min(100, Math.max(0, v * 100));
+
+  return `<article class="${cls}">
+    <div class="between" style="align-items:flex-start">
+      <span class="badge tier-${rec.tier}"><span class="dot"></span>${TIER_LABEL[rec.tier]}</span>
+      <div class="right">
+        <div class="xs muted">Odds</div>
+        <div class="tabular" style="font-size:var(--t-lg);font-weight:600">${fmtOdds(rec.odds)}</div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="xs muted">${esc(rec.market ?? "Market")}</div>
+      <h3 style="margin-top:2px;font-size:var(--t-lg)">${esc(rec.selection ?? "—")}</h3>
+    </div>
+
+    <div style="margin-top:16px">
+      <div>
+        <div class="between xs" style="flex-wrap:nowrap">
+          <span class="muted">Our probability</span>
+          <span class="tabular" style="font-weight:500">${fmtPct(ours, 0)}</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill bar-ours" style="width:${pct(ours)}%"></div></div>
+      </div>
+      <div style="margin-top:10px">
+        <div class="between xs" style="flex-wrap:nowrap">
+          <span class="muted">Bookmaker implies</span>
+          <span class="tabular" style="font-weight:500">${fmtPct(theirs, 0)}</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill bar-theirs" style="width:${pct(theirs)}%"></div></div>
+      </div>
+    </div>
+
+    <div class="between" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--navy-800);align-items:flex-end">
+      <div>
+        <div class="xs muted">Edge</div>
+        <div class="tabular ${edgeValue > 0 ? "pos" : "neg"}" style="font-size:var(--t-lg);font-weight:600">
+          ${fmtSignedPct(edgeValue)}
+        </div>
+      </div>
+      <div class="right">
+        <div class="xs muted">Suggested stake</div>
+        <div class="tabular small" style="font-weight:500">
+          ${fmtStake(rec.stake_units)} units${
+            num(rec.stake_amount) != null
+              ? ` <span class="muted">(${fmtMoney(rec.stake_amount, currency)})</span>`
+              : ""
+          }
+        </div>
+      </div>
+    </div>
+
+    ${rec.rationale ? `
+      <details style="margin-top:16px;padding-top:16px;border-top:1px solid var(--navy-800)">
+        <summary class="small">Why this pick<span class="caret" aria-hidden="true">▾</span></summary>
+        <p class="measure small muted" style="margin-top:8px">${esc(rec.rationale)}</p>
+      </details>` : ""}
+
+    ${controls}
+  </article>`;
+}
+
+/* ===========================================================================
+   The worked example on the landing page.
+
+   Every number here is computed with the functions above, not written by hand
+   to look persuasive. A page whose whole argument is "check the arithmetic"
+   cannot afford arithmetic that does not check out:
+
+     book        1/1.92 + 1/3.50 + 1/3.90 = 1.0630  ->  6.3% margin
+     safe        0.80 x 1.28 - 1 = +2.4% edge  ->  2.14 units at quarter-Kelly
+     balanced    0.52 x 2.05 - 1 = +6.6% edge  ->  1.57 units at quarter-Kelly
+     aggressive  nothing above 3.00 clears the bar  ->  no value
+   ======================================================================== */
+const SAMPLE_MATCH = {
+  home: "Brighton", away: "Crystal Palace",
+  competition: "Premier League", bookmaker: "Betway", kickoff: "Saturday, 15:00",
+  margin: [1.92, 3.5, 3.9].reduce((sum, o) => sum + impliedProbability(o), 0) - 1,
+  summary:
+    "Brighton have won four of their last six at home and press high; Palace have kept " +
+    "one clean sheet in nine on the road. Palace are without their first-choice centre-back " +
+    "through suspension, and both sides have scored in five of the last six meetings.",
+};
+
+const samplePick = (tier, market, selection, odds, p, rationale) => ({
+  tier, no_value: false, market, selection, odds,
+  model_probability: p,
+  implied_probability: impliedProbability(odds),
+  edge_percent: edge(p, odds),
+  stake_units: Number(quarterKellyUnits(p, odds).toFixed(2)),
+  stake_amount: Number((quarterKellyUnits(p, odds) * 10).toFixed(2)),
+  rationale,
+});
+
+const SAMPLE_PICKS = [
+  samplePick("SAFE", "Double Chance", "Brighton or Draw", 1.28, 0.80,
+    "Brighton have lost once at home in eleven, and Palace's away record this season is two " +
+    "wins in nine. The suspension of Palace's first-choice centre-back matters more than the " +
+    "aggregate table position suggests. The main risk is rotation: Brighton play in Europe on " +
+    "Thursday and have rested starters in this fixture before."),
+  samplePick("BALANCED", "Over/Under 2.5 Goals", "Over 2.5 Goals", 2.05, 0.52,
+    "Five of the last six meetings between these sides went over 2.5, and Brighton's high " +
+    "defensive line has conceded in eight of their last ten. Palace score on the counter but " +
+    "concede chances doing it. The risk is weather — heavy rain is forecast, and this fixture " +
+    "has gone under twice in wet conditions."),
+  { tier: "AGGRESSIVE", no_value: true },
+];
+
+/* ===========================================================================
+   Landing page
+
+   Tone: direct, numerate, and about process rather than money. No fabricated
+   earnings counters, no invented testimonials, no countdown timers — the
+   credibility of this product is its arithmetic, and borrowed hype undermines
+   it.
+   ======================================================================== */
+const HOW_IT_WORKS = [
+  ["Screenshot the odds.",
+   "Any bookmaker, any market, any layout. Betway, Hollywoodbets, Bet365, Supabets — if you can read it, so can we."],
+  ["We do the work you don't have time for.",
+   "We pull the last six matches for both sides, confirmed injuries and suspensions, head-to-head history, and home/away splits. Then we build our own probability for every selection on your screen."],
+  ["You get three bets and one honest verdict.",
+   "Safe, balanced, aggressive — each with its edge, its suggested stake, and the reasoning. And when the odds are simply bad, we say so instead of inventing a pick."],
+];
+
+const WHY_IT_WORKS = [
+  ["Three tiers, one screenshot.",
+   "A cautious accumulator anchor and a genuine long shot are different bets for different moods. You get both, plus the middle, and you decide which one fits your night."],
+  ["Edge, in writing.",
+   "Our probability against the bookmaker's implied probability, on every single pick. If we say 61% and they're pricing 54%, you can see the gap that justifies the stake."],
+  ["We tell you to skip.",
+   "Most matches have no value in them. Tools that always find you a bet are selling you action, not analysis. When there's no edge, the card says so — and that's the pick."],
+  ["A history that doesn't flatter you.",
+   "Mark every bet won or lost. Your real ROI, strike rate and per-tier performance, including the losing months. If the aggressive picks aren't paying for themselves, the numbers will tell you before your bankroll does."],
+];
+
+const PLAN_FEATURES = [
+  "Unlimited match analyses",
+  "Live form, injury and head-to-head enrichment",
+  "Three risk-tiered picks per match",
+  "Fractional-Kelly stake sizing",
+  "Full performance history and ROI tracking",
+  "CSV export",
+];
+
+const FAQ = [
+  ["Will this make me money?",
+   "Honest answer: it improves your decisions, and better decisions compound. But betting has variance, losing runs are mathematically normal, and a realistic long-term edge is a few percent, not a fortune. Anyone promising more is selling you something."],
+  ["Which bookmakers does it work with?", "All of them. We read the screenshot, not an API."],
+  ["Where does the data come from?",
+   "Live web search at the moment of analysis — recent results, confirmed team news, head-to-head records, home and away form."],
+  ["What if my screenshot is blurry?", "We'll tell you and ask for a clearer one rather than guess at the odds."],
+  ["How fast is it?", "Twenty to forty seconds. It's searching and reasoning, not looking something up in a table."],
+  ["Can I cancel?", "Any time, from your Whop dashboard. No email, no retention call."],
+  ["Is betting legal where I am?", "Depends on your country. Check before you use this."],
+];
+
+function heroMockup() {
+  const rows = SAMPLE_PICKS.map((pick) => {
+    if (pick.no_value) {
+      return `<div style="padding:14px 16px;border-top:1px solid var(--navy-800)">
+        <div class="between" style="flex-wrap:nowrap">
+          <span class="xs dim" style="font-weight:500">${TIER_LABEL[pick.tier]}</span>
+          <span class="tabular xs dim">No value found</span>
+        </div>
+        <p class="small muted" style="margin-top:4px">Nothing above 3.00 is priced longer than the evidence justifies.</p>
+      </div>`;
+    }
+    return `<div style="padding:14px 16px;border-top:1px solid var(--navy-800)">
+      <div class="between" style="flex-wrap:nowrap">
+        <span class="xs" style="font-weight:500;color:var(--tier-${pick.tier.toLowerCase()})">${TIER_LABEL[pick.tier]}</span>
+        <span class="tabular xs muted">${esc(pick.market)}</span>
+      </div>
+      <div class="between" style="margin-top:6px;flex-wrap:nowrap;align-items:baseline">
+        <span class="small" style="font-weight:500">${esc(pick.selection)}</span>
+        <span class="tabular small" style="font-weight:600">${fmtOdds(pick.odds)}</span>
+      </div>
+      <div class="between tabular xs" style="margin-top:8px;flex-wrap:nowrap">
+        <span class="muted">Ours ${fmtPct(pick.model_probability, 0)} · Theirs ${fmtPct(pick.implied_probability, 0)}</span>
+        <span class="pos" style="font-weight:600">${fmtSignedPct(pick.edge_percent)}</span>
+      </div>
+      <div class="bar-track" style="margin-top:8px;height:4px">
+        <div class="bar-fill bar-ours" style="width:${pick.model_probability * 100}%"></div>
+      </div>
+    </div>`;
+  }).join("");
+
+  return `<div class="card">
+    <div class="between" style="padding:12px 16px;align-items:baseline">
+      <div>
+        <div class="small" style="font-weight:600">${SAMPLE_MATCH.home} v ${SAMPLE_MATCH.away}</div>
+        <div class="tabular xs muted" style="margin-top:2px">${SAMPLE_MATCH.competition} · ${SAMPLE_MATCH.bookmaker}</div>
+      </div>
+      <div class="tabular xs right">
+        <div class="muted">House margin</div>
+        <div>${fmtPct(SAMPLE_MATCH.margin)}</div>
+      </div>
+    </div>
+    ${rows}
+  </div>`;
+}
+
+/* The coin-flip book drawn to scale: two bars at 52.6% inside a 100% frame.
+   The part that overflows is the margin, and seeing it overflow does more work
+   than the sentence explaining it. */
+function marginExample() {
+  const side = impliedProbability(1.9) * 100;
+  const total = side * 2;
+  return `<div class="card card-pad">
+    <div class="tabular">
+      ${["Heads at 1.90", "Tails at 1.90"].map((label) => `
+        <div style="margin-bottom:14px">
+          <div class="between xs" style="flex-wrap:nowrap">
+            <span class="muted">${label}</span><span>implies ${side.toFixed(1)}%</span>
+          </div>
+          <div class="bar-track" style="height:8px"><div class="bar-fill bar-theirs" style="width:${side}%"></div></div>
+        </div>`).join("")}
+    </div>
+
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--navy-800)">
+      <div class="between tabular" style="flex-wrap:nowrap;align-items:baseline">
+        <span class="small muted">Total implied probability</span>
+        <span style="font-size:var(--t-lg);font-weight:600">${total.toFixed(1)}%</span>
+      </div>
+      <div class="bar-track" style="height:8px;margin-top:12px;display:flex">
+        <div style="height:100%;background:rgba(148,163,184,.5);width:${(100 / total) * 100}%"></div>
+        <div style="height:100%;background:var(--tier-aggressive);width:${((total - 100) / total) * 100}%"></div>
+      </div>
+      <div class="between tabular xs" style="margin-top:8px;flex-wrap:nowrap">
+        <span class="muted">A fair book: 100%</span>
+        <span style="color:var(--tier-aggressive)">House margin: ${(total - 100).toFixed(1)}%</span>
+      </div>
+    </div>
+
+    <p class="small muted" style="margin-top:20px;padding-top:16px;border-top:1px solid var(--navy-800)">
+      Break-even strike rate at 1.90:
+      <span class="tabular" style="color:var(--slate-100);font-weight:600">${(impliedProbability(1.9) * 100).toFixed(1)}%</span>
+    </p>
+  </div>`;
+}
+
+function viewLanding() {
+  return `${siteHeader()}
+  <main>
+    <section class="wrap" style="padding-top:56px;padding-bottom:64px">
+      <div class="grid-2" style="align-items:center">
+        <div>
+          <h1>Your bookmaker did the math. You didn't.</h1>
+          <p class="measure muted" style="margin-top:24px">
+            Every odd on that screen is a probability the bookmaker calculated, marked up,
+            and is betting you won't check. OddScope checks it. Screenshot the match, get
+            three bets ranked by risk, and see the exact edge on each one before a cent
+            leaves your account.
+          </p>
+          <div style="margin-top:32px">
+            <a href="#/signup" class="btn btn-primary btn-lg">Start your free trial</a>
+            <p class="tabular small muted" style="margin-top:12px">
+              3 days free. Then ${CONFIG.PRICE_LABEL}/month. Cancel anytime.
+            </p>
+          </div>
+        </div>
+        ${heroMockup()}
+      </div>
+    </section>
+
+    <section class="section"><div class="wrap">
+      <h2>Most bettors lose to a number they never look at</h2>
+      <div class="grid-2" style="margin-top:32px">
+        <div class="measure muted stack">
+          <p>A bookmaker offers 1.90 on both sides of a coin flip. That looks fair. It isn't.
+             Those two odds imply a 105.3% total probability — the extra 5.3% is the house's
+             margin, and it's the reason a 50/50 bettor goes broke slowly and predictably.</p>
+          <p>At 1.90, you need to win 52.6% of your bets just to break even. Not 50%. That gap
+             is the entire game, and OddScope is built to find the matches where the number is
+             on your side.</p>
+        </div>
+        ${marginExample()}
+      </div>
+    </div></section>
+
+    <section class="section" id="how"><div class="wrap">
+      <h2>How it works</h2>
+      <ol class="grid-3" style="margin-top:32px;padding:0;list-style:none">
+        ${HOW_IT_WORKS.map(([title, body], i) => `
+          <li class="card card-pad">
+            <span class="tabular small" style="color:var(--blue-400);font-weight:500">${String(i + 1).padStart(2, "0")}</span>
+            <h3 style="margin-top:12px">${title}</h3>
+            <p class="small muted" style="margin-top:8px">${body}</p>
+          </li>`).join("")}
+      </ol>
+    </div></section>
+
+    <section class="section" id="why"><div class="wrap">
+      <h2>Why it works</h2>
+      <div style="margin-top:32px;display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
+        ${WHY_IT_WORKS.map(([title, body]) => `
+          <div class="card card-pad">
+            <h3>${title}</h3>
+            <p class="small muted" style="margin-top:8px">${body}</p>
+          </div>`).join("")}
+      </div>
+    </div></section>
+
+    <section class="section"><div class="wrap">
+      <h2>Sample analysis</h2>
+      <p class="measure muted" style="margin-top:12px">
+        This is the whole product. An example of what one screenshot returns, including a
+        tier we refused to fill.
+      </p>
+      <div class="card" style="margin-top:32px">
+        <div class="card-head">
+          <div class="between" style="align-items:baseline">
+            <div>
+              <h3 style="font-size:var(--t-lg)">${SAMPLE_MATCH.home} v ${SAMPLE_MATCH.away}</h3>
+              <p class="tabular small muted" style="margin-top:4px">
+                ${SAMPLE_MATCH.competition} · ${SAMPLE_MATCH.kickoff} · ${SAMPLE_MATCH.bookmaker}
+              </p>
+            </div>
+            <p class="tabular small muted">
+              House margin on this market: <span style="color:var(--slate-100)">${fmtPct(SAMPLE_MATCH.margin)}</span>
+            </p>
+          </div>
+          <p class="measure small muted" style="margin-top:12px">${SAMPLE_MATCH.summary}</p>
+        </div>
+        <div class="grid-3" style="padding:20px">
+          ${SAMPLE_PICKS.map((pick) => tierCard(pick)).join("")}
+        </div>
+      </div>
+      <p class="xs muted" style="margin-top:16px">
+        Example output from a past fixture, shown to illustrate the format. Not a live market.
+      </p>
+    </div></section>
+
+    <section class="section" id="pricing"><div class="wrap">
+      <h2>Pricing</h2>
+      <div class="card card-pad" style="margin-top:32px;max-width:420px">
+        <div class="row" style="align-items:baseline;gap:8px">
+          <span class="tabular" style="font-size:var(--t-2xl);font-weight:600">${CONFIG.PRICE_LABEL}</span>
+          <span class="muted">/ month</span>
+        </div>
+        <p class="small muted" style="margin-top:8px">Three days free, first. No card charged until day four.</p>
+        <ul style="margin-top:24px;padding:0;list-style:none">
+          ${PLAN_FEATURES.map((f) => `
+            <li class="row small" style="align-items:flex-start;gap:12px;margin-top:10px">
+              <span style="width:6px;height:6px;border-radius:999px;background:var(--blue-500);margin-top:9px;flex:0 0 auto"></span>
+              <span>${f}</span>
+            </li>`).join("")}
+        </ul>
+        <a href="#/signup" class="btn btn-primary btn-lg btn-block" style="margin-top:28px">Start free trial</a>
+        <p class="xs muted center" style="margin-top:12px">Cancel anytime from your Whop account.</p>
+      </div>
+    </div></section>
+
+    <section class="section" id="faq"><div class="wrap">
+      <h2>Questions</h2>
+      <div class="faq" style="margin-top:32px">
+        ${FAQ.map(([q, a]) => `
+          <details>
+            <summary>${esc(q)}<span class="caret" aria-hidden="true">▾</span></summary>
+            <p class="measure small muted" style="padding-bottom:20px">${esc(a)}</p>
+          </details>`).join("")}
+      </div>
+      <p class="small muted" style="margin-top:40px">
+        Ready to check a match? <a href="#/signup">Start your free trial</a>.
+      </p>
+    </div></section>
+  </main>
+  ${siteFooter()}`;
+}
+
+/* ===========================================================================
+   Auth
+
+   Login and sign-up share one shape, so they share one view. Supabase Auth
+   handles both password and Google entirely from the browser; there is no
+   session server to talk to.
+   ======================================================================== */
+function viewAuth(mode) {
+  const signup = mode === "signup";
+  return `<div class="wrap wrap-narrow" style="max-width:420px;padding-top:48px;padding-bottom:48px">
+    <div class="center"><a href="#/" aria-label="OddScope home">${logo()}</a></div>
+
+    <div style="margin-top:40px">
+      <h1 style="font-size:var(--t-lg)">${signup ? "Start your free trial" : "Log in"}</h1>
+      <p class="small muted" style="margin-top:4px">
+        ${signup ? "Three days free. No card until day four." : "Welcome back."}
+      </p>
+
+      <button class="btn btn-secondary btn-lg btn-block" style="margin-top:24px" data-google>
+        Continue with Google
+      </button>
+
+      <div class="row xs muted" style="margin:24px 0">
+        <span style="height:1px;flex:1;background:var(--navy-800)"></span>or
+        <span style="height:1px;flex:1;background:var(--navy-800)"></span>
+      </div>
+
+      <form data-auth-form class="stack">
+        ${signup ? `
+          <div>
+            <label class="field-label" for="name">Name</label>
+            <input class="input" id="name" name="name" autocomplete="name">
+          </div>` : ""}
+        <div>
+          <label class="field-label" for="email">Email</label>
+          <input class="input" id="email" name="email" type="email" required autocomplete="email">
+        </div>
+        <div>
+          <label class="field-label" for="password">Password</label>
+          <input class="input" id="password" name="password" type="password" required
+                 ${signup ? 'minlength="10"' : ""}
+                 autocomplete="${signup ? "new-password" : "current-password"}">
+          ${signup ? `<p class="note">At least 10 characters.</p>` : ""}
+        </div>
+        <p class="note note-error hidden" data-auth-error></p>
+        <button class="btn btn-primary btn-lg btn-block" type="submit">
+          ${signup ? "Start free trial" : "Log in"}
+        </button>
+      </form>
+
+      <p class="small muted center" style="margin-top:24px">
+        ${signup
+          ? `Already have an account? <a href="#/login">Log in</a>`
+          : `No account yet? <a href="#/signup">Start a free trial</a>`}
+      </p>
+
+      ${signup ? `
+        <p class="measure xs muted" style="margin-top:24px">
+          By creating an account you confirm you are 18 or older and accept our
+          <a href="#/terms">terms</a> and <a href="#/privacy">privacy policy</a>.
+        </p>` : ""}
+    </div>
+  </div>`;
+}
+
+function bindAuth(mode) {
+  const signup = mode === "signup";
+  const form = $("[data-auth-form]");
+  const errorEl = $("[data-auth-error]");
+
+  const fail = (message) => {
+    errorEl.textContent = message;
+    errorEl.classList.remove("hidden");
+  };
+
+  $("[data-google]")?.addEventListener("click", async () => {
+    const { error } = await sb.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}${window.location.pathname}#/dashboard` },
+    });
+    if (error) fail(error.message);
+  });
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    errorEl.classList.add("hidden");
+    const button = $("button[type=submit]", form);
+    button.disabled = true;
+    button.textContent = "Just a moment…";
+
+    const data = Object.fromEntries(new FormData(form));
+    const email = String(data.email).trim().toLowerCase();
+    const password = String(data.password);
+
+    try {
+      if (signup) {
+        const { error } = await sb.auth.signUp({
+          email, password,
+          options: { data: { name: String(data.name ?? "").trim() || null } },
+        });
+        if (error) { fail(error.message); return; }
+
+        // With email confirmation switched on, signUp returns no session. Say
+        // so plainly rather than silently landing on a logged-out dashboard.
+        const { data: session } = await sb.auth.getSession();
+        if (!session?.session) {
+          form.innerHTML = `<p class="small">Check your inbox — we've sent a confirmation link to
+            <strong>${esc(email)}</strong>. Your three-day trial starts when you confirm.</p>`;
+          return;
+        }
+      } else {
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) { fail("That email and password don't match an account."); return; }
+      }
+      await boot();
+      go("#/dashboard");
+    } finally {
+      button.disabled = false;
+      button.textContent = signup ? "Start free trial" : "Log in";
+    }
+  });
+}
+
+/* ===========================================================================
+   The one-time risk acknowledgement.
+
+   No close button and no backdrop dismissal — the checkbox and the button are
+   the only way past it. A disclaimer that can be clicked away without being
+   read is decoration.
+   ======================================================================== */
+function riskModal() {
+  return `<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="risk-title">
+    <div class="modal card card-pad">
+      <h2 id="risk-title" style="font-size:var(--t-lg)">Before you start</h2>
+      <div class="measure small muted stack" style="margin-top:16px">
+        <p>Everything OddScope returns is a probability estimate, not a prediction. The edge on
+           a pick is our best reading of the evidence, and our reading can be wrong.</p>
+        <p>Losing runs are statistically expected. Even a genuine long-term edge produces
+           stretches of consecutive losses — that is what variance is, and it is not evidence
+           that anything has broken.</p>
+        <p style="color:var(--slate-100)">Stake only what you can afford to lose. If betting has
+           stopped being something you choose to do, stop and talk to someone.</p>
+      </div>
+      <label class="row small" style="margin-top:20px;align-items:flex-start;cursor:pointer">
+        <input type="checkbox" data-risk-check style="width:20px;height:20px;accent-color:var(--blue-500);margin-top:2px">
+        <span>I understand these are estimates and that I can lose money.</span>
+      </label>
+      <button class="btn btn-primary btn-lg btn-block" style="margin-top:20px" data-risk-accept disabled>
+        Continue
+      </button>
+    </div>
+  </div>`;
+}
+
+function bindRiskModal() {
+  const root = $("#modal-root");
+  if (!state.profile || state.profile.risk_acknowledged_at) { root.innerHTML = ""; return; }
+  root.innerHTML = riskModal();
+
+  const check = $("[data-risk-check]", root);
+  const accept = $("[data-risk-accept]", root);
+  check.addEventListener("change", () => { accept.disabled = !check.checked; });
+  accept.addEventListener("click", async () => {
+    accept.disabled = true;
+    accept.textContent = "Saving…";
+    const stamp = new Date().toISOString();
+    await sb.from("profiles").update({ risk_acknowledged_at: stamp }).eq("id", state.profile.id);
+    state.profile.risk_acknowledged_at = stamp;
+    root.innerHTML = "";
+  });
+}
+
+/* ===========================================================================
+   Plan gating
+   ======================================================================== */
+function hasAnalysisAccess(profile) {
+  if (!profile) return false;
+  const now = Date.now();
+  if (profile.plan === "ACTIVE") {
+    return !profile.subscription_ends_at || Date.parse(profile.subscription_ends_at) > now;
+  }
+  if (profile.plan === "TRIAL") {
+    return Boolean(profile.trial_ends_at) && Date.parse(profile.trial_ends_at) > now;
+  }
+  return false;
+}
+
+function denialReason(profile) {
+  if (!profile || hasAnalysisAccess(profile)) return null;
+  if (profile.plan === "TRIAL") return "Your three-day trial has ended.";
+  if (profile.plan === "ACTIVE") return "Your subscription period has ended.";
+  return "Your subscription is no longer active.";
+}
+
+/** The checkout link carries the OddScope user id so the webhook can match the
+    incoming membership to the right account. */
+function checkoutUrl() {
+  const base = CONFIG.WHOP_CHECKOUT_URL;
+  const separator = base.includes("?") ? "&" : "?";
+  return `${base}${separator}metadata[oddscope_user_id]=${encodeURIComponent(state.profile?.id ?? "")}`;
+}
+
+function trialBanner() {
+  if (!state.profile || state.profile.plan !== "TRIAL" || !state.profile.trial_ends_at) return "";
+  const ended = Date.parse(state.profile.trial_ends_at) <= Date.now();
+  return `<div class="banner">
+    <p class="small">
+      ${ended ? "Your trial has ended." : `Trial ends in <span class="tabular" style="font-weight:500">${daysRemaining(state.profile.trial_ends_at)}</span>.`}
+      <span class="muted">${CONFIG.PRICE_LABEL}/month after that. Cancel anytime.</span>
+    </p>
+    <a href="${esc(checkoutUrl())}" target="_blank" rel="noopener noreferrer" class="small" style="font-weight:500">
+      Subscribe on Whop
+    </a>
+  </div>`;
+}
+
+/* ===========================================================================
+   Dashboard
+   ======================================================================== */
+async function viewDashboard() {
+  const [{ data: recs }, { data: analyses }] = await Promise.all([
+    sb.from("recommendations")
+      .select("tier, outcome, odds, stake_units, profit_loss, settled_at, analyses!inner(user_id)")
+      .eq("no_value", false)
+      .eq("analyses.user_id", state.profile.id),
+    sb.from("analyses")
+      .select("id, home_team, away_team, competition, status, created_at, recommendations(tier, outcome, no_value)")
+      .eq("user_id", state.profile.id)
+      .order("created_at", { ascending: false })
+      .limit(8),
+  ]);
+
+  const stats = summarize(recs ?? []);
+  const rows = analyses ?? [];
+
+  const list = rows.length === 0
+    ? emptyState(
+        "Nothing analyzed yet.",
+        "Screenshot a match and let's look at the numbers.",
+        `<a href="#/analyze" class="btn btn-primary btn-lg">Analyze a match</a>`)
+    : `<ul class="card" style="list-style:none;padding:0;margin:0;overflow:hidden">
+        ${rows.map((analysis, i) => {
+          const failed = analysis.status === "FAILED";
+          const processing = analysis.status === "PROCESSING";
+          const title = failed ? "Screenshot could not be read"
+            : processing ? "Analysis in progress"
+            : `${analysis.home_team} v ${analysis.away_team}`;
+
+          const chips = TIER_ORDER.map((tier) => {
+            const rec = (analysis.recommendations ?? []).find((r) => r.tier === tier);
+            if (!rec) return "";
+            const label = rec.no_value ? `${TIER_LABEL[tier]}: no value found`
+              : `${TIER_LABEL[tier]}: ${rec.outcome === "UNMARKED" ? "not yet marked" : rec.outcome.toLowerCase()}`;
+            const cls = rec.no_value ? "chip-none"
+              : rec.outcome === "WON" ? "chip-won"
+              : rec.outcome === "LOST" ? "chip-lost"
+              : rec.outcome === "VOID" ? "chip-void" : "";
+            const glyph = rec.no_value ? "–"
+              : rec.outcome === "WON" ? "W"
+              : rec.outcome === "LOST" ? "L"
+              : rec.outcome === "VOID" ? "V" : TIER_LABEL[tier][0];
+            const style = !rec.no_value && rec.outcome === "UNMARKED"
+              ? ` style="color:var(--tier-${tier.toLowerCase()})"` : "";
+            return `<span class="chip ${cls}"${style} title="${esc(label)}">${glyph}<span class="sr-only">${esc(label)}</span></span>`;
+          }).join("");
+
+          return `<li${i ? ' style="border-top:1px solid var(--navy-800)"' : ""}>
+            <a href="#/analysis/${analysis.id}" class="between"
+               style="padding:12px 16px;min-height:64px;color:inherit;flex-wrap:nowrap">
+              <span style="min-width:0">
+                <span class="small" style="font-weight:500;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(title)}</span>
+                <span class="tabular xs muted">${fmtDate(analysis.created_at)}${analysis.competition ? ` · ${esc(analysis.competition)}` : ""}</span>
+              </span>
+              <span class="row" style="gap:6px;flex:0 0 auto">${chips}</span>
+            </a>
+          </li>`;
+        }).join("")}
+      </ul>`;
+
+  return `${appNav("#/dashboard")}
+  <main class="wrap" style="padding-top:32px;padding-bottom:32px">
+    ${trialBanner()}
+    <div class="between">
+      <div>
+        <h1 style="font-size:var(--t-lg)">Your numbers</h1>
+        <p class="small muted" style="margin-top:4px">
+          Every settled bet you have marked, and what it actually returned.
+        </p>
+      </div>
+      <a href="#/analyze" class="btn btn-primary btn-lg">Analyze a match</a>
+    </div>
+
+    <div class="tiles" style="margin-top:24px">
+      ${statTile("Bets settled", String(stats.betsSettled))}
+      ${statTile("Strike rate", fmtPct(stats.strikeRate),
+        stats.betsSettled ? `${stats.won}W · ${stats.lost}L` : "",
+        stats.strikeRate == null ? "dim" : "")}
+      ${statTile("ROI", fmtSignedPct(stats.roi), "Profit per unit staked", toneOf(stats.roi))}
+      ${statTile("Net units", fmtUnits(stats.netUnits), "", toneOf(stats.netUnits))}
+      ${statTile("Current streak",
+        stats.streak ? `${stats.streak.length}${stats.streak.type}` : "—",
+        "", stats.streak ? (stats.streak.type === "W" ? "pos" : "neg") : "dim")}
+    </div>
+
+    <section style="margin-top:40px">
+      <div class="between" style="align-items:baseline">
+        <h2>Recent analyses</h2>
+        ${rows.length ? `<a href="#/history" class="small">Full history</a>` : ""}
+      </div>
+      <div style="margin-top:16px">${list}</div>
+    </section>
+  </main>
+  ${siteFooter()}`;
+}
+
+/* ===========================================================================
+   Analyze — upload, processing, and the handoff to the results page
+   ======================================================================== */
+const STAGES = [
+  ["reading", "Reading the odds"],
+  ["identifying", "Identifying the match"],
+  ["researching", "Pulling form and team news"],
+  ["calculating", "Calculating edge"],
+];
+
+const MAX_WIDTH = 1600;
+const ACCEPTED = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+
+/**
+ * Compression happens here, in the browser, before upload: a phone screenshot
+ * is often 3-8MB and most of that is resolution the model cannot use, the
+ * upload is the slowest part of the flow on mobile data, and the image is
+ * billed by size on the way to the API.
+ */
+async function compressScreenshot(file) {
+  if (!ACCEPTED.includes(file.type)) {
+    throw new Error("That file type isn't supported. Use a PNG, JPG or WebP.");
+  }
+  // imageOrientation honours EXIF, so a photo taken in portrait does not
+  // arrive sideways and unreadable.
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  const scale = Math.min(1, MAX_WIDTH / bitmap.width);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Your browser couldn't process that image.");
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return canvas.toDataURL("image/jpeg", 0.82);
+}
+
+function viewAnalyze() {
+  return `${appNav("#/analyze")}
+  <main class="wrap wrap-narrow" style="padding-top:32px;padding-bottom:32px">
+    <h1 style="font-size:var(--t-lg)">Analyze a match</h1>
+    <p class="measure small muted" style="margin-top:4px">
+      Screenshot the odds board for a single match. Any bookmaker, any market.
+    </p>
+    <div id="analyze-body" style="margin-top:24px"></div>
+  </main>
+  ${siteFooter()}`;
+}
+
+function uploadStep() {
+  return `<div>
+    <div class="dropzone" data-dropzone>
+      <div data-empty>
+        <div class="center" style="padding:40px 20px">
+          <p class="small" style="font-weight:500">Drop your odds screenshot here</p>
+          <p class="xs muted" style="margin-top:4px">PNG, JPG or WebP. Compressed on your device before it is sent.</p>
+          <div class="row" style="justify-content:center;margin-top:20px;flex-wrap:wrap">
+            <button class="btn btn-secondary btn-lg" data-pick>Choose a file</button>
+            <button class="btn btn-secondary btn-lg" data-camera>Take a photo</button>
+          </div>
+        </div>
+      </div>
+      <div data-preview class="hidden" style="padding:16px">
+        <img class="preview-img" alt="Your uploaded odds screenshot">
+        <button class="btn btn-ghost" data-clear style="margin-top:12px">Choose a different screenshot</button>
+      </div>
+    </div>
+    <input type="file" class="sr-only" data-file accept="${ACCEPTED.join(",")}">
+    <input type="file" class="sr-only" data-file-camera accept="image/*" capture="environment">
+
+    <p class="note note-error hidden" data-upload-error></p>
+
+    <div style="margin-top:24px">
+      <label class="field-label" for="notes">Anything we should know?</label>
+      <textarea class="textarea" id="notes" maxlength="1000"
+                placeholder="Injuries, weather, lineup news."></textarea>
+    </div>
+
+    <button class="btn btn-primary btn-lg btn-block" style="margin-top:24px" data-submit disabled>
+      Analyze this match
+    </button>
+  </div>`;
+}
+
+function processingStep(stage, match) {
+  const currentIndex = STAGES.findIndex(([key]) => key === stage);
+  return `<div class="card center" role="status" aria-live="polite"
+       style="padding:56px 24px;display:flex;flex-direction:column;align-items:center">
+    ${crosshair({ size: 56, color: "var(--blue-400)", spinning: true })}
+    <p class="" style="margin-top:24px;font-weight:500">
+      ${match ? `${esc(match.homeTeam)} v ${esc(match.awayTeam)}` : "Analyzing your screenshot"}
+    </p>
+    <p class="small muted" style="margin-top:4px">Usually twenty to forty seconds.</p>
+    <ol class="steps">
+      ${STAGES.map(([key, label], i) => {
+        const cls = i < currentIndex ? "done" : i === currentIndex ? "active" : "";
+        const marker = i < currentIndex
+          ? `<span class="marker">✓</span>`
+          : `<span class="marker"><span></span></span>`;
+        return `<li class="${cls}">${marker}<span>${label}${i === currentIndex ? "…" : ""}</span></li>`;
+      }).join("")}
+    </ol>
+  </div>`;
+}
+
+function errorStep(message, { retryable = true, upgrade = false } = {}) {
+  return `<div class="card center" style="padding:48px 24px">
+    <h2 style="font-size:var(--t-base)">${upgrade ? "Your plan has lapsed" : "That didn't work"}</h2>
+    <p class="measure small muted" style="margin:8px auto 0">${esc(message)}</p>
+    <div class="row" style="justify-content:center;margin-top:24px;flex-wrap:wrap">
+      ${upgrade ? `<a href="#/upgrade" class="btn btn-primary btn-lg">See your options</a>` : ""}
+      ${retryable ? `<button class="btn btn-secondary btn-lg" data-retry>Try another screenshot</button>` : ""}
+    </div>
+  </div>`;
+}
+
+/**
+ * Drive the analysis.
+ *
+ * On success this navigates to #/analysis/:id rather than rendering results in
+ * place: the analysis is a real record, so its results deserve a real URL that
+ * survives a refresh and a back button.
+ */
+function bindAnalyze() {
+  const body = $("#analyze-body");
+  let image = null;
+  let running = false;
+
+  function renderUpload() {
+    body.innerHTML = uploadStep();
+
+    const zone = $("[data-dropzone]", body);
+    const fileInput = $("[data-file]", body);
+    const cameraInput = $("[data-file-camera]", body);
+    const errorEl = $("[data-upload-error]", body);
+    const submit = $("[data-submit]", body);
+
+    async function accept(file) {
+      if (!file) return;
+      errorEl.classList.add("hidden");
+      try {
+        image = await compressScreenshot(file);
+        $("[data-preview] img", body).src = image;
+        $("[data-empty]", body).classList.add("hidden");
+        $("[data-preview]", body).classList.remove("hidden");
+        submit.disabled = false;
+      } catch (error) {
+        errorEl.textContent = error.message || "We couldn't read that file.";
+        errorEl.classList.remove("hidden");
+      }
+    }
+
+    $("[data-pick]", body).addEventListener("click", () => fileInput.click());
+    $("[data-camera]", body).addEventListener("click", () => cameraInput.click());
+    fileInput.addEventListener("change", (e) => accept(e.target.files?.[0]));
+    cameraInput.addEventListener("change", (e) => accept(e.target.files?.[0]));
+
+    $("[data-clear]", body).addEventListener("click", () => {
+      image = null;
+      submit.disabled = true;
+      $("[data-empty]", body).classList.remove("hidden");
+      $("[data-preview]", body).classList.add("hidden");
+    });
+
+    zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("dragging"); });
+    zone.addEventListener("dragleave", () => zone.classList.remove("dragging"));
+    zone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      zone.classList.remove("dragging");
+      accept(e.dataTransfer.files?.[0]);
+    });
+
+    submit.addEventListener("click", () => run($("#notes", body).value));
+  }
+
+  function showError(message, options) {
+    body.innerHTML = errorStep(message, options);
+    $("[data-retry]", body)?.addEventListener("click", renderUpload);
+  }
+
+  async function run(notes) {
+    if (running || !image) return;
+    running = true;
+    let match = null;
+    body.innerHTML = processingStep("reading", null);
+
+    try {
+      const { data: sessionData } = await sb.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) { go("#/login"); return; }
+
+      const response = await fetch(ANALYZE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          apikey: CONFIG.SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ image, notes: notes.trim() || undefined }),
+      });
+
+      // Rejections before the stream opens (auth, plan, limits) come back as
+      // ordinary JSON with a status code.
+      if (!response.ok || !response.body) {
+        const payload = await response.json().catch(() => null);
+        showError(payload?.error ?? "We couldn't start the analysis. Try again.", {
+          retryable: response.status !== 402,
+          upgrade: response.status === 402,
+        });
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      // Newline-delimited JSON: a chunk may split a line, so only whole lines
+      // are parsed and the remainder is carried forward.
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let event;
+          try { event = JSON.parse(line); } catch { continue; }
+
+          if (event.stage === "done") { go(`#/analysis/${event.analysisId}`); return; }
+          if (event.stage === "error") {
+            showError(event.message ?? "Something went wrong.", { retryable: event.retryable !== false });
+            return;
+          }
+          if (event.homeTeam && event.awayTeam) {
+            match = { homeTeam: event.homeTeam, awayTeam: event.awayTeam };
+          }
+          body.innerHTML = processingStep(event.stage, match);
+        }
+      }
+
+      // The stream ended without a terminal event — a dropped connection.
+      showError("The connection dropped before the analysis finished. Try again.");
+    } catch {
+      showError("We lost the connection. Check your network and try again.");
+    } finally {
+      running = false;
+    }
+  }
+
+  renderUpload();
+}
+
+/* ===========================================================================
+   Results for one analysis
+   ======================================================================== */
+async function viewAnalysis(id) {
+  const { data: analysis } = await sb
+    .from("analyses")
+    .select("*, recommendations(*)")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!analysis) {
+    return `${appNav("")}<main class="wrap" style="padding:48px 0">
+      ${emptyState("Nothing here", "That analysis doesn't exist, or it isn't yours to see.",
+        `<a href="#/dashboard" class="btn btn-secondary btn-lg">Back to your dashboard</a>`)}
+    </main>${siteFooter()}`;
+  }
+
+  if (analysis.status === "FAILED") {
+    return `${appNav("")}<main class="wrap wrap-narrow" style="padding:32px 0">
+      <div class="card center" style="padding:48px 24px">
+        <h1 style="font-size:var(--t-base)">We couldn't read that screenshot</h1>
+        <p class="measure small muted" style="margin:8px auto 0">
+          ${esc(analysis.failure_reason ?? "Something went wrong reading that image. Try a clearer screenshot.")}
+        </p>
+        <a href="#/analyze" class="btn btn-primary btn-lg" style="margin-top:24px">Try another screenshot</a>
+      </div>
+    </main>${siteFooter()}`;
+  }
+
+  if (analysis.status === "PROCESSING") {
+    return `${appNav("")}<main class="wrap wrap-narrow" style="padding:32px 0">
+      <div class="card center" style="padding:56px 24px;display:flex;flex-direction:column;align-items:center">
+        ${crosshair({ size: 48, color: "var(--blue-400)", spinning: true })}
+        <h1 style="font-size:var(--t-base);margin-top:24px">Still working</h1>
+        <p class="small muted" style="margin-top:8px">This analysis hasn't finished yet. Refresh in a moment.</p>
+      </div>
+    </main>${siteFooter()}`;
+  }
+
+  const recs = TIER_ORDER
+    .map((tier) => (analysis.recommendations ?? []).find((r) => r.tier === tier))
+    .filter(Boolean);
+
+  const meta = [
+    analysis.competition,
+    analysis.kickoff ? fmtDateTime(analysis.kickoff) : null,
+    analysis.bookmaker,
+  ].filter(Boolean).map(esc).join(" · ");
+
+  const cards = recs.map((rec) => {
+    const editable = !rec.settled_at || Date.now() - Date.parse(rec.settled_at) <= 86400000;
+    return tierCard(rec, {
+      currency: state.profile.currency,
+      reveal: true,
+      controls: rec.no_value ? "" : settleControls(rec, editable),
+    });
+  }).join("");
+
+  return `${appNav("")}
+  <main class="wrap wrap-mid" style="padding-top:32px;padding-bottom:32px">
+    <header class="card card-pad">
+      <div class="between" style="align-items:flex-start">
+        <div>
+          <h1 style="font-size:var(--t-lg)">${esc(analysis.home_team)} v ${esc(analysis.away_team)}</h1>
+          ${meta ? `<p class="tabular small muted" style="margin-top:4px">${meta}</p>` : ""}
+        </div>
+        ${num(analysis.bookmaker_margin) != null ? `
+          <p class="tabular small muted">House margin on this market:
+            <span style="color:var(--slate-100);font-weight:500">${fmtPct(analysis.bookmaker_margin)}</span>
+          </p>` : ""}
+      </div>
+      ${analysis.match_summary ? `<p class="measure small muted" style="margin-top:16px">${esc(analysis.match_summary)}</p>` : ""}
+      ${analysis.user_notes ? `
+        <p class="small muted" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--navy-800)">
+          <span style="color:var(--slate-100)">Your note:</span> ${esc(analysis.user_notes)}
+        </p>` : ""}
+    </header>
+
+    <div class="grid-3" style="margin-top:24px">${cards}</div>
+
+    <div class="row" style="justify-content:center;margin-top:32px;flex-wrap:wrap">
+      <a href="#/analyze" class="btn btn-primary btn-lg">Analyze another match</a>
+      <a href="#/history" class="small" style="padding:12px">See your history</a>
+    </div>
+  </main>
+  ${siteFooter()}`;
+}
+
+/**
+ * Won and Lost are the two real buttons. Void exists because bookmakers void
+ * bets and pretending otherwise would corrupt the history; it is deliberately
+ * quieter. The 24-hour window is enforced by the database, not here — this
+ * only reflects it.
+ */
+function settleControls(rec, editable) {
+  if (rec.outcome !== "UNMARKED") {
+    const label = rec.outcome === "WON" ? "Marked won"
+      : rec.outcome === "LOST" ? "Marked lost" : "Marked void";
+    const cls = rec.outcome === "WON" ? "pos" : rec.outcome === "LOST" ? "neg" : "muted";
+    return `<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--navy-800)">
+      <div class="between" style="flex-wrap:nowrap">
+        <span class="small ${cls}" style="font-weight:500">${label}</span>
+        ${editable
+          ? `<button class="btn btn-ghost" data-settle="${rec.id}" data-outcome="UNMARKED">Undo</button>`
+          : `<span class="xs muted">Final</span>`}
+      </div>
+    </div>`;
+  }
+
+  return `<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--navy-800)">
+    <div class="row" style="gap:8px">
+      <button class="btn btn-secondary btn-lg btn-won" style="flex:1" data-settle="${rec.id}" data-outcome="WON">Won</button>
+      <button class="btn btn-secondary btn-lg btn-lost" style="flex:1" data-settle="${rec.id}" data-outcome="LOST">Lost</button>
+    </div>
+    <button class="btn btn-ghost btn-block xs" style="margin-top:8px" data-settle="${rec.id}" data-outcome="VOID">
+      Bet was voided
+    </button>
+  </div>`;
+}
+
+function bindSettle() {
+  on("[data-settle]", "click", async (event) => {
+    const button = event.currentTarget;
+    const id = button.dataset.settle;
+    const outcome = button.dataset.outcome;
+
+    $$("[data-settle]").forEach((el) => { el.disabled = true; });
+
+    // profit_loss and settled_at are computed by the database — the only thing
+    // sent here is the outcome, and the trigger reverts anything else.
+    const { error } = await sb.from("recommendations").update({ outcome }).eq("id", id);
+
+    if (error) {
+      toast(error.message || "We couldn't save that.", true);
+      $$("[data-settle]").forEach((el) => { el.disabled = false; });
+      return;
+    }
+    await render();
+  });
+}
+
+/* ===========================================================================
+   History
+   ======================================================================== */
+function historyFilters() {
+  const params = new URLSearchParams(routeQuery());
+  const value = (key) => params.get(key) ?? "";
+  const options = (list, selected) => list.map(([v, label]) =>
+    `<option value="${v}"${v === selected ? " selected" : ""}>${label}</option>`).join("");
+
+  return `<form data-filters style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+    <div>
+      <label class="sr-only" for="f-tier">Tier</label>
+      <select class="select" id="f-tier" name="tier">${options([
+        ["", "All tiers"], ["SAFE", "Safe"], ["BALANCED", "Balanced"], ["AGGRESSIVE", "Aggressive"],
+      ], value("tier"))}</select>
+    </div>
+    <div>
+      <label class="sr-only" for="f-outcome">Outcome</label>
+      <select class="select" id="f-outcome" name="outcome">${options([
+        ["", "All outcomes"], ["WON", "Won"], ["LOST", "Lost"], ["VOID", "Void"], ["UNMARKED", "Not yet marked"],
+      ], value("outcome"))}</select>
+    </div>
+    <div>
+      <label class="sr-only" for="f-from">From date</label>
+      <input class="input tabular" id="f-from" name="from" type="date" value="${esc(value("from"))}">
+    </div>
+    <div>
+      <label class="sr-only" for="f-to">To date</label>
+      <input class="input tabular" id="f-to" name="to" type="date" value="${esc(value("to"))}">
+    </div>
+    <div class="row" style="gap:8px">
+      <button class="btn btn-secondary" type="submit" style="flex:1">Apply</button>
+      ${[...params].length ? `<button class="btn btn-ghost" type="button" data-clear-filters>Clear</button>` : ""}
+    </div>
+  </form>`;
+}
+
+const OUTCOME_LABEL = { WON: "Won", LOST: "Lost", VOID: "Void", UNMARKED: "Open" };
+const OUTCOME_CLASS = { WON: "pos", LOST: "neg", VOID: "muted", UNMARKED: "dim" };
+
+async function viewHistory() {
+  const params = new URLSearchParams(routeQuery());
+
+  let query = sb.from("recommendations")
+    .select("*, analyses!inner(id, home_team, away_team, competition, created_at, user_id)")
+    .eq("no_value", false)
+    .eq("analyses.user_id", state.profile.id)
+    .order("created_at", { referencedTable: "analyses", ascending: false })
+    .limit(1000);
+
+  if (params.get("tier")) query = query.eq("tier", params.get("tier"));
+  if (params.get("outcome")) query = query.eq("outcome", params.get("outcome"));
+  if (params.get("from")) query = query.gte("analyses.created_at", `${params.get("from")}T00:00:00Z`);
+  if (params.get("to")) query = query.lte("analyses.created_at", `${params.get("to")}T23:59:59Z`);
+
+  const { data } = await query;
+  const rows = (data ?? []).sort(
+    (a, b) => new Date(b.analyses.created_at) - new Date(a.analyses.created_at),
+  );
+
+  // Every aggregate is computed from the filtered rows, so the summary bar
+  // always describes exactly what is in the table below it.
+  const stats = summarize(rows);
+  const tiers = breakdownByTier(rows);
+
+  const table = rows.length === 0
+    ? emptyState("Nothing here yet.",
+        "Analyses with a bet in them show up here once you have run one. If you have filters set, try clearing them.",
+        `<a href="#/analyze" class="btn btn-primary btn-lg">Analyze a match</a>`)
+    : `<div class="table-scroll"><table style="min-width:820px">
+        <thead><tr>
+          <th>Date</th><th>Match</th><th>Market</th><th>Selection</th>
+          <th class="right">Odds</th><th>Tier</th><th>Outcome</th><th class="right">P/L</th>
+        </tr></thead>
+        <tbody>${rows.map((row) => `
+          <tr>
+            <td class="tabular muted" style="white-space:nowrap">${fmtDate(row.analyses.created_at)}</td>
+            <td><a href="#/analysis/${row.analyses.id}" style="color:var(--slate-100)">
+              ${esc(row.analyses.home_team)} v ${esc(row.analyses.away_team)}</a></td>
+            <td class="muted">${esc(row.market ?? "—")}</td>
+            <td>${esc(row.selection ?? "—")}</td>
+            <td class="tabular right">${fmtOdds(row.odds)}</td>
+            <td><span class="badge tier-${row.tier}"><span class="dot"></span>${TIER_LABEL[row.tier]}</span></td>
+            <td class="${OUTCOME_CLASS[row.outcome]}">${OUTCOME_LABEL[row.outcome]}</td>
+            <td class="tabular right ${toneOf(row.profit_loss) === "pos" ? "pos" : toneOf(row.profit_loss) === "neg" ? "neg" : "muted"}">
+              ${row.outcome === "UNMARKED" ? "—" : fmtUnits(row.profit_loss)}</td>
+          </tr>`).join("")}
+        </tbody></table></div>`;
+
+  return `${appNav("#/history")}
+  <main class="wrap" style="padding-top:32px;padding-bottom:32px">
+    <div class="between">
+      <div>
+        <h1 style="font-size:var(--t-lg)">History</h1>
+        <p class="small muted" style="margin-top:4px">Every bet you have marked, and what it actually returned.</p>
+      </div>
+      <button class="btn btn-secondary" data-export>Export CSV</button>
+    </div>
+
+    <div style="margin-top:24px">${historyFilters()}</div>
+
+    <div class="tiles" style="margin-top:24px">
+      ${statTile("Bets settled", String(stats.betsSettled))}
+      ${statTile("Strike rate", fmtPct(stats.strikeRate), stats.betsSettled ? `${stats.won}W · ${stats.lost}L` : "")}
+      ${statTile("ROI", fmtSignedPct(stats.roi), "", toneOf(stats.roi))}
+      ${statTile("Net units", fmtUnits(stats.netUnits), "", toneOf(stats.netUnits))}
+      ${statTile("Open bets", String(stats.pending), "", stats.pending ? "" : "dim")}
+    </div>
+
+    <section class="card card-pad" style="margin-top:24px">
+      <h2 class="small muted" style="font-weight:500">Cumulative units</h2>
+      <div style="margin-top:16px">${unitsChart(cumulativeUnits(rows))}</div>
+    </section>
+
+    <section style="margin-top:24px">
+      <h2>By tier</h2>
+      <p class="small muted" style="margin-top:4px">Whether each risk level is paying for itself, for you specifically.</p>
+      <div class="table-scroll" style="margin-top:16px"><table style="min-width:560px">
+        <thead><tr>
+          <th>Tier</th><th class="right">Settled</th><th class="right">Strike rate</th>
+          <th class="right">Avg odds</th><th class="right">Net units</th><th class="right">ROI</th>
+        </tr></thead>
+        <tbody>${tiers.map((tier) => `
+          <tr>
+            <th scope="row" style="font-weight:500;color:var(--tier-${tier.tier.toLowerCase()});border-bottom:1px solid var(--navy-800)">
+              ${TIER_LABEL[tier.tier]}</th>
+            <td class="tabular right">${tier.betsSettled}</td>
+            <td class="tabular right">${fmtPct(tier.strikeRate)}</td>
+            <td class="tabular right muted">${fmtOdds(tier.averageOdds)}</td>
+            <td class="tabular right ${toneOf(tier.netUnits) === "pos" ? "pos" : toneOf(tier.netUnits) === "neg" ? "neg" : "muted"}">
+              ${fmtUnits(tier.netUnits)}</td>
+            <td class="tabular right ${toneOf(tier.roi) === "pos" ? "pos" : toneOf(tier.roi) === "neg" ? "neg" : "muted"}">
+              ${fmtSignedPct(tier.roi)}</td>
+          </tr>`).join("")}
+        </tbody></table></div>
+    </section>
+
+    <section style="margin-top:32px">
+      <h2>Every bet</h2>
+      <div style="margin-top:16px">${table}</div>
+    </section>
+  </main>
+  ${siteFooter()}`;
+}
+
+function bindHistory(rowsProvider) {
+  $("[data-filters]")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const params = new URLSearchParams();
+    for (const [key, value] of new FormData(event.currentTarget)) {
+      if (value) params.set(key, String(value));
+    }
+    go(`#/history${params.toString() ? `?${params}` : ""}`);
+  });
+
+  $("[data-clear-filters]")?.addEventListener("click", () => go("#/history"));
+
+  $("[data-export]")?.addEventListener("click", async () => {
+    const rows = await rowsProvider();
+    // Values are written raw rather than pre-formatted: a spreadsheet should
+    // get 0.072, not "+7.2%", so the user can do their own arithmetic on ours.
+    const columns = [
+      "date", "match", "competition", "market", "selection", "odds", "tier",
+      "model_probability", "implied_probability", "edge", "stake_units",
+      "stake_amount", "outcome", "profit_loss_units", "settled_at",
+    ];
+    const cell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const lines = [columns.join(","), ...rows.map((r) => [
+      r.analyses.created_at,
+      `${r.analyses.home_team} v ${r.analyses.away_team}`,
+      r.analyses.competition, r.market, r.selection, r.odds, r.tier,
+      r.model_probability, r.implied_probability, r.edge_percent,
+      r.stake_units, r.stake_amount, r.outcome, r.profit_loss, r.settled_at,
+    ].map(cell).join(","))];
+
+    const blob = new Blob([`${lines.join("\r\n")}\r\n`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `oddscope-history-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+/* ===========================================================================
+   Settings
+   ======================================================================== */
+const SUPPORT_RESOURCES = [
+  ["South African Responsible Gambling Foundation",
+   "Free counselling. 0800 006 008, or WhatsApp 076 675 0710.",
+   "https://www.responsiblegambling.org.za/"],
+  ["GamCare (UK)", "24-hour helpline and live chat. 0808 8020 133.", "https://www.gamcare.org.uk/"],
+  ["Gamblers Anonymous", "Peer support groups worldwide.", "https://www.gamblersanonymous.org/"],
+];
+
+async function viewSettings() {
+  const profile = state.profile;
+  const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+  const { count: usedThisMonth } = await sb
+    .from("analyses")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", profile.id)
+    .gte("created_at", monthStart.toISOString());
+
+  const planLabel = profile.plan === "ACTIVE" ? "Active"
+    : profile.plan === "TRIAL" ? "Free trial" : "Expired";
+  const renewal = profile.plan === "TRIAL" ? profile.trial_ends_at : profile.subscription_ends_at;
+  const unitSize = num(profile.stake_unit_size) ?? 10;
+
+  return `${appNav("#/settings")}
+  <main class="wrap wrap-narrow" style="padding-top:32px;padding-bottom:32px">
+    <h1 style="font-size:var(--t-lg)">Settings</h1>
+
+    <div class="stack" style="margin-top:24px">
+      <section class="card">
+        <div class="card-head"><h2>Profile</h2></div>
+        <div class="card-pad">
+          <form data-form="profile" class="stack">
+            <div>
+              <label class="field-label" for="s-name">Name</label>
+              <input class="input" id="s-name" name="name" maxlength="120" value="${esc(profile.name ?? "")}">
+            </div>
+            <div>
+              <label class="field-label" for="s-email">Email</label>
+              <input class="input" id="s-email" value="${esc(profile.email)}" readonly disabled>
+              <p class="note">Your email is how your Whop subscription finds this account.</p>
+            </div>
+            <button class="btn btn-primary" type="submit">Save profile</button>
+            <p class="note hidden" data-status></p>
+          </form>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Password</h2></div>
+        <div class="card-pad">
+          <form data-form="password" class="stack">
+            <div>
+              <label class="field-label" for="s-password">New password</label>
+              <input class="input" id="s-password" name="password" type="password"
+                     minlength="10" autocomplete="new-password">
+              <p class="note">At least 10 characters. Setting one lets you log in with email as well as Google.</p>
+            </div>
+            <button class="btn btn-primary" type="submit">Update password</button>
+            <p class="note hidden" data-status></p>
+          </form>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Staking</h2></div>
+        <div class="card-pad">
+          <form data-form="staking" class="stack">
+            <div>
+              <label class="field-label" for="s-currency">Currency</label>
+              <select class="select" id="s-currency" name="currency">
+                ${CURRENCIES.map((code) =>
+                  `<option value="${code}"${code === profile.currency ? " selected" : ""}>${code} (${symbolFor(code).trim()})</option>`).join("")}
+              </select>
+            </div>
+            <div>
+              <label class="field-label" for="s-bankroll">Bankroll</label>
+              <input class="input tabular" id="s-bankroll" name="bankroll" type="number" min="0" step="0.01"
+                     placeholder="0" value="${profile.bankroll ?? ""}">
+              <p class="note">The total you are prepared to risk. Used for context, never spent.</p>
+            </div>
+            <div>
+              <label class="field-label" for="s-unit">Stake unit size</label>
+              <input class="input tabular" id="s-unit" name="stake_unit_size" type="number" min="0.01" step="0.01"
+                     placeholder="10" value="${profile.stake_unit_size ?? ""}">
+              <p class="note">One unit is ${esc(symbolFor(profile.currency))}${unitSize}. A pick sized at 1.40 units
+                 means ${esc(fmtMoney(unitSize * 1.4, profile.currency))}. Recommendations are capped at three units.</p>
+            </div>
+            <button class="btn btn-primary" type="submit">Save staking</button>
+            <p class="note hidden" data-status></p>
+          </form>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Subscription</h2></div>
+        <div class="card-pad">
+          <dl class="small stack" style="margin:0">
+            <div class="between" style="flex-wrap:nowrap"><dt class="muted">Current plan</dt>
+              <dd style="margin:0;font-weight:500">${planLabel}</dd></div>
+            <div class="between" style="flex-wrap:nowrap"><dt class="muted">${profile.plan === "TRIAL" ? "Trial ends" : "Renews"}</dt>
+              <dd class="tabular" style="margin:0">${renewal ? fmtDate(renewal) : "—"}</dd></div>
+            <div class="between" style="flex-wrap:nowrap"><dt class="muted">Price</dt>
+              <dd class="tabular" style="margin:0">${CONFIG.PRICE_LABEL} / month</dd></div>
+          </dl>
+          <div class="row" style="margin-top:20px;flex-wrap:wrap">
+            <a class="btn btn-secondary btn-lg" href="${esc(CONFIG.WHOP_PORTAL_URL)}" target="_blank" rel="noopener noreferrer">
+              Manage subscription</a>
+            ${profile.plan !== "ACTIVE" ? `
+              <a class="btn btn-primary btn-lg" href="${esc(checkoutUrl())}" target="_blank" rel="noopener noreferrer">
+                Subscribe on Whop</a>` : ""}
+          </div>
+          <p class="xs muted" style="margin-top:12px">
+            Billing, card details and cancellation are handled entirely by Whop. OddScope never
+            sees your payment information.
+          </p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Responsible use</h2></div>
+        <div class="card-pad">
+          <form data-form="limit" class="stack">
+            <p class="measure small muted">
+              You can cap how many analyses you run in a calendar month. Once you reach it, new
+              analyses are blocked until the month rolls over. Your history and settings stay open.
+            </p>
+            <div>
+              <label class="field-label" for="s-limit">Monthly analysis limit</label>
+              <input class="input tabular" id="s-limit" name="monthly_analysis_limit" type="number"
+                     min="1" step="1" placeholder="No limit" value="${profile.monthly_analysis_limit ?? ""}">
+              <p class="note"><span class="tabular">${usedThisMonth ?? 0}</span> used this month. Leave blank for no limit.</p>
+            </div>
+            <button class="btn btn-primary" type="submit">Save limit</button>
+            <p class="note hidden" data-status></p>
+          </form>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>If betting has stopped being a choice</h2></div>
+        <div class="card-pad">
+          <p class="measure small muted">These services are free, confidential, and not connected to us in any way.</p>
+          <ul style="margin-top:16px;padding:0;list-style:none">
+            ${SUPPORT_RESOURCES.map(([name, detail, href]) => `
+              <li style="margin-top:16px">
+                <a href="${href}" target="_blank" rel="noopener noreferrer" class="small" style="font-weight:500">${name}</a>
+                <p class="tabular small muted" style="margin-top:2px">${detail}</p>
+              </li>`).join("")}
+          </ul>
+        </div>
+      </section>
+    </div>
+  </main>
+  ${siteFooter()}`;
+}
+
+function bindSettings() {
+  const numberOrNull = (value) => (value === "" ? null : Number(value));
+
+  on("[data-form]", "submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const kind = form.dataset.form;
+    const status = $("[data-status]", form);
+    const button = $("button[type=submit]", form);
+    const data = Object.fromEntries(new FormData(form));
+
+    const show = (message, isError) => {
+      status.textContent = message;
+      status.classList.remove("hidden");
+      status.classList.toggle("note-error", Boolean(isError));
+    };
+
+    button.disabled = true;
+    try {
+      if (kind === "password") {
+        const password = String(data.password ?? "");
+        if (password.length < 10) { show("Use at least 10 characters.", true); return; }
+        const { error } = await sb.auth.updateUser({ password });
+        show(error ? error.message : "Password updated.", Boolean(error));
+        form.reset();
+        return;
+      }
+
+      const patch = kind === "profile"
+        ? { name: String(data.name ?? "").trim() || null }
+        : kind === "staking"
+          ? {
+              currency: String(data.currency),
+              bankroll: numberOrNull(data.bankroll),
+              stake_unit_size: numberOrNull(data.stake_unit_size),
+            }
+          : { monthly_analysis_limit: numberOrNull(data.monthly_analysis_limit) };
+
+      const { error } = await sb.from("profiles").update(patch).eq("id", state.profile.id);
+      if (error) { show(error.message, true); return; }
+
+      Object.assign(state.profile, patch);
+      show("Saved.", false);
+      if (kind === "staking") await render();
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+/* ===========================================================================
+   Upgrade
+   ======================================================================== */
+function viewUpgrade() {
+  return `${appNav("")}
+  <main class="wrap wrap-narrow" style="padding-top:40px;padding-bottom:40px">
+    <h1 style="font-size:var(--t-lg)">${esc(denialReason(state.profile) ?? "Your subscription is not active.")}</h1>
+    <p class="measure small muted" style="margin-top:8px">
+      New analyses are paused until you subscribe. Your history, your settings and every analysis
+      you have already run stay exactly where they are — you can read and export all of it right now.
+    </p>
+
+    <div class="card card-pad" style="margin-top:32px">
+      <div class="row" style="align-items:baseline;gap:8px">
+        <span class="tabular" style="font-size:var(--t-2xl);font-weight:600">${CONFIG.PRICE_LABEL}</span>
+        <span class="muted">/ month</span>
+      </div>
+      <ul style="margin-top:24px;padding:0;list-style:none">
+        ${PLAN_FEATURES.map((f) => `
+          <li class="row small" style="align-items:flex-start;gap:12px;margin-top:10px">
+            <span style="width:6px;height:6px;border-radius:999px;background:var(--blue-500);margin-top:9px;flex:0 0 auto"></span>
+            <span>${f}</span>
+          </li>`).join("")}
+      </ul>
+      <a class="btn btn-primary btn-lg btn-block" style="margin-top:28px"
+         href="${esc(checkoutUrl())}" target="_blank" rel="noopener noreferrer">Subscribe on Whop</a>
+      <p class="xs muted center" style="margin-top:12px">
+        Checkout, billing and cancellation are handled by Whop. Cancel anytime.
+      </p>
+    </div>
+
+    <div class="row" style="margin-top:32px;gap:24px;flex-wrap:wrap">
+      <a href="#/history" class="small">Read your history</a>
+      <a href="#/settings" class="small">Account settings</a>
+    </div>
+  </main>
+  ${siteFooter()}`;
+}
+
+/* ===========================================================================
+   Static pages
+   ======================================================================== */
+function legalShell(title, updated, sections) {
+  return `${state.session ? appNav("") : siteHeader()}
+  <main class="wrap" style="max-width:760px;padding-top:56px;padding-bottom:56px">
+    <h1 style="font-size:var(--t-lg)">${esc(title)}</h1>
+    ${updated ? `<p class="tabular small muted" style="margin-top:4px">${esc(updated)}</p>` : ""}
+    <div class="measure small muted" style="margin-top:32px">
+      ${sections.map(([heading, ...paragraphs]) => `
+        <section style="margin-bottom:28px">
+          ${heading ? `<h2 style="font-size:var(--t-base);color:var(--slate-100)">${heading}</h2>` : ""}
+          ${paragraphs.map((p) => `<p style="margin-top:12px">${p}</p>`).join("")}
+        </section>`).join("")}
+    </div>
+  </main>
+  ${siteFooter()}`;
+}
+
+const viewTerms = () => legalShell("Terms of use", "Last updated 9 September 2026", [
+  ["What OddScope is",
+   "OddScope is a statistical analysis tool. It reads odds from a screenshot you provide, researches the fixture, and reports its own probability estimate alongside the bookmaker's implied probability. It does not place bets, hold funds, or act as a bookmaker or betting intermediary."],
+  ["What it is not",
+   "Nothing OddScope returns is a prediction, a guarantee, or financial advice. Every figure is an estimate produced from publicly available information, and estimates are wrong some of the time. <strong style=\"color:var(--slate-100)\">You are solely responsible for every bet you place and every rand you stake.</strong>"],
+  ["Eligibility",
+   "You must be at least 18 years old, and betting must be lawful where you are. It is your responsibility to know the law in your jurisdiction before using this service."],
+  ["Your account",
+   "Keep your login details to yourself. You are responsible for activity under your account. Do not share, resell or redistribute OddScope output as a tipping service."],
+  ["Subscription and billing",
+   "New accounts get three days of full access. After that the subscription is R147 per month, billed by Whop. All payment processing, renewals and cancellations happen on Whop — we never see or store your card details. Cancel any time from your Whop dashboard; access continues to the end of the period you have paid for."],
+  ["Availability",
+   "The service depends on third-party providers for analysis and for the data it researches. We do not guarantee uninterrupted availability, and an analysis may fail or return no result. When that happens we tell you rather than guessing."],
+  ["Limitation of liability",
+   "To the fullest extent permitted by law, OddScope is not liable for betting losses, lost profits, or any indirect or consequential loss arising from your use of the service. Our total liability is limited to the amount you paid us in the twelve months before the claim."],
+]);
+
+const viewPrivacy = () => legalShell("Privacy policy", "Last updated 9 September 2026", [
+  ["What we collect",
+   "Your email address and name; the screenshots you upload and any notes you add to them; the analyses we produce and the outcomes you mark; and your staking preferences. If you sign in with Google we receive your email address and name from Google."],
+  ["What we do with it",
+   "We use it to run the analyses you ask for, to build your performance history, and to keep your subscription in sync with Whop. We do not sell your data, and we do not use your betting history for advertising."],
+  ["Who else sees it",
+   "Your screenshot and the odds read from it are sent to Anthropic's API to perform the analysis. Subscription events come to us from Whop. Our database and authentication are hosted by Supabase. That is the complete list of third parties that touch your data."],
+  ["Passwords",
+   "Authentication is handled by Supabase Auth. Passwords are hashed before storage; we cannot read yours and cannot recover it for you."],
+  ["How long we keep it",
+   "Analyses and their results are kept for as long as your account exists, because they are your performance history. Delete your account and everything attached to it is deleted with it."],
+  ["Your rights",
+   "You can export your history as CSV at any time from the history page. To request a copy of everything we hold, or deletion of your account, email us at the address on the contact page."],
+]);
+
+const viewResponsible = () => legalShell("Responsible gambling", "", [
+  ["", "OddScope is built to make betting more deliberate. That only works if the deliberation includes whether to bet at all."],
+  ["What the numbers actually mean",
+   "A positive edge is not a win. It means that if the same bet were available a thousand times, you would expect to come out ahead across all thousand. You are not getting a thousand. You are getting one, and one bet with a 6% edge still loses about as often as the odds say it will.",
+   "Losing runs are mathematically normal. A bettor with a genuine long-term edge will still have losing weeks, losing months, and stretches of eight or ten losses in a row. That is variance doing what variance does — not a broken system, and not a reason to raise your stakes to catch up."],
+  ["Signs worth taking seriously",
+   "Betting more than you planned. Chasing losses with bigger stakes. Borrowing to bet. Hiding it from people close to you. Betting to feel better rather than because you saw something worth backing. Being unable to stop when you decide to."],
+  ["What you can do here",
+   `Set a monthly analysis limit in <a href="#/settings">your settings</a>. When you hit it, new analyses stop until the month turns over — no override, no upsell. Your history stays readable so you can look at your actual returns rather than the ones you remember.`],
+  ["Where to get help",
+   SUPPORT_RESOURCES.map(([name, detail, href]) =>
+     `<a href="${href}" target="_blank" rel="noopener noreferrer">${name}</a> — ${detail}`).join("<br>"),
+   "These services are free, confidential, and have nothing to do with us. Using them is not an admission of anything."],
+]);
+
+const viewContact = () => legalShell("Contact", "", [
+  ["Support",
+   `Email <a href="mailto:support@oddscope.app">support@oddscope.app</a>. Include the date and the match name if you are writing about a specific analysis — that is enough for us to find it.`],
+  ["Billing",
+   `Subscriptions, invoices and cancellations are handled by Whop. Cancel from your <a href="${CONFIG.WHOP_PORTAL_URL}" target="_blank" rel="noopener noreferrer">Whop dashboard</a> — no email required, and no retention call.`],
+  ["Something wrong with an analysis?",
+   "Tell us. If we misread a price off a screenshot, that is a bug and we want to see it. If you disagree with a probability estimate, that is a judgement call and we are still interested — the reasoning is written out on every pick precisely so it can be argued with."],
+]);
+
+/* ===========================================================================
+   Router
+   ======================================================================== */
+const routePath = () => (window.location.hash.replace(/^#/, "").split("?")[0] || "/");
+const routeQuery = () => window.location.hash.split("?")[1] ?? "";
+
+const PUBLIC_ROUTES = ["/", "/login", "/signup", "/terms", "/privacy", "/responsible", "/contact"];
+
+async function render() {
+  const app = $("#app");
+  const path = routePath();
+
+  // Configuration check before anything else — an unconfigured page failing
+  // with a network error tells the person setting it up nothing useful.
+  if (CONFIG.SUPABASE_ANON_KEY === "PASTE_YOUR_ANON_KEY_HERE") {
+    app.innerHTML = `<main class="wrap wrap-narrow" style="padding:64px 0">
+      <div class="card card-pad">
+        <h1 style="font-size:var(--t-lg)">Almost there</h1>
+        <p class="measure small muted" style="margin-top:12px">
+          Open <code>index.html</code>, find the <code>CONFIG</code> block near the top of the
+          script, and paste your Supabase <strong style="color:var(--slate-100)">anon</strong> key
+          into <code>SUPABASE_ANON_KEY</code>. You will find it under Project Settings → API.
+        </p>
+        <p class="measure small muted" style="margin-top:12px">
+          The anon key is meant to be public — row-level security is what protects your data.
+          Never paste the <strong style="color:var(--slate-100)">service_role</strong> key here.
+        </p>
+      </div></main>`;
+    return;
+  }
+
+  if (!state.session && !PUBLIC_ROUTES.includes(path) && !path.startsWith("/analysis/")) {
+    go("#/login");
+    return;
+  }
+
+  // A signed-in visitor landing on the marketing or auth pages goes to work.
+  if (state.session && ["/", "/login", "/signup"].includes(path)) {
+    go("#/dashboard");
+    return;
+  }
+
+  switch (true) {
+    case path === "/":          app.innerHTML = viewLanding(); break;
+    case path === "/login":     app.innerHTML = viewAuth("login"); bindAuth("login"); break;
+    case path === "/signup":    app.innerHTML = viewAuth("signup"); bindAuth("signup"); break;
+    case path === "/terms":     app.innerHTML = viewTerms(); break;
+    case path === "/privacy":   app.innerHTML = viewPrivacy(); break;
+    case path === "/responsible": app.innerHTML = viewResponsible(); break;
+    case path === "/contact":   app.innerHTML = viewContact(); break;
+
+    case path === "/dashboard": app.innerHTML = await viewDashboard(); break;
+
+    case path === "/analyze":
+      if (!hasAnalysisAccess(state.profile)) { go("#/upgrade"); return; }
+      app.innerHTML = viewAnalyze();
+      bindAnalyze();
+      break;
+
+    case path.startsWith("/analysis/"):
+      app.innerHTML = await viewAnalysis(path.slice("/analysis/".length));
+      bindSettle();
+      break;
+
+    case path === "/history": {
+      app.innerHTML = await viewHistory();
+      // The export re-runs the same query, so what is exported is exactly what
+      // the user was looking at when they pressed the button.
+      bindHistory(async () => {
+        const params = new URLSearchParams(routeQuery());
+        let query = sb.from("recommendations")
+          .select("*, analyses!inner(id, home_team, away_team, competition, created_at, user_id)")
+          .eq("no_value", false)
+          .eq("analyses.user_id", state.profile.id)
+          .limit(1000);
+        if (params.get("tier")) query = query.eq("tier", params.get("tier"));
+        if (params.get("outcome")) query = query.eq("outcome", params.get("outcome"));
+        if (params.get("from")) query = query.gte("analyses.created_at", `${params.get("from")}T00:00:00Z`);
+        if (params.get("to")) query = query.lte("analyses.created_at", `${params.get("to")}T23:59:59Z`);
+        const { data } = await query;
+        return data ?? [];
+      });
+      break;
+    }
+
+    case path === "/settings":  app.innerHTML = await viewSettings(); bindSettings(); break;
+
+    case path === "/upgrade":
+      // Self-healing: if the profile says the plan is live, send them back
+      // rather than showing a paywall they have already cleared.
+      if (hasAnalysisAccess(state.profile)) { go("#/analyze"); return; }
+      app.innerHTML = viewUpgrade();
+      break;
+
+    default:
+      app.innerHTML = `${state.session ? appNav("") : siteHeader()}
+        <main class="wrap" style="padding:64px 0">
+          ${emptyState("Nothing here", "That page doesn't exist, or it isn't yours to see.",
+            `<a href="#${state.session ? "/dashboard" : "/"}" class="btn btn-secondary btn-lg">
+               Back to ${state.session ? "your dashboard" : "the home page"}</a>`)}
+        </main>${siteFooter()}`;
+  }
+
+  on("[data-signout]", "click", async () => {
+    await sb.auth.signOut();
+    state.session = null;
+    state.profile = null;
+    go("#/");
+  });
+
+  if (state.session) bindRiskModal();
+  window.scrollTo(0, 0);
+}
+
+/* ===========================================================================
+   Boot
+   ======================================================================== */
+async function boot() {
+  const { data } = await sb.auth.getSession();
+  state.session = data?.session ?? null;
+
+  if (state.session) {
+    const { data: profile } = await sb
+      .from("profiles").select("*").eq("id", state.session.user.id).maybeSingle();
+
+    // The profile is created by a trigger on auth.users. On the very first
+    // page load after a confirmation redirect that trigger has occasionally
+    // not landed yet, so give it one retry before giving up.
+    state.profile = profile ?? await new Promise((resolve) => {
+      setTimeout(async () => {
+        const { data: retry } = await sb
+          .from("profiles").select("*").eq("id", state.session.user.id).maybeSingle();
+        resolve(retry ?? null);
+      }, 700);
+    });
+  } else {
+    state.profile = null;
+  }
+
+  state.booted = true;
+}
+
+window.addEventListener("hashchange", () => { render(); });
+
+if (!window.location.hash) window.location.hash = "#/";
+
+if (!sb) {
+  // Every CDN failed. Say so, rather than leaving a blank page behind.
+  document.getElementById("app").innerHTML = `
+    <main class="wrap wrap-narrow" style="padding:64px 0">
+      <div class="card card-pad">
+        <h1 style="font-size:var(--t-lg)">Couldn't load</h1>
+        <p class="measure small muted" style="margin-top:12px">
+          OddScope needs to fetch one library the first time it loads, and the network blocked
+          it. Check your connection and reload. If you are on a network that filters CDNs,
+          this page will not run there.
+        </p>
+        <button class="btn btn-secondary btn-lg" style="margin-top:20px"
+                onclick="window.location.reload()">Reload</button>
+      </div>
+    </main>`;
+} else {
+  // Subscribed only once there is a client to subscribe to. SIGNED_IN also
+  // fires on the OAuth redirect back from Google.
+  sb.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_IN" || event === "SIGNED_OUT") boot().then(render);
+  });
+
+  await boot();
+  await render();
+}
+</script>
+</body>
+</html>
