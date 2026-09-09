@@ -30,25 +30,28 @@ supabase db push
 
 ### 2. Configure the page
 
-Open `index.html`, find the `CONFIG` block near the top of the script, and paste your
-**anon** key:
+The Supabase URL and anon key for project `fttdtvmfzaggfihieurr` are already filled in.
+The rest of the `CONFIG` block, near the top of the script, is Whop:
 
 ```js
 const CONFIG = {
   SUPABASE_URL: "https://fttdtvmfzaggfihieurr.supabase.co",
-  SUPABASE_ANON_KEY: "eyJ...",          // Project Settings -> API -> anon / public
-  WHOP_CHECKOUT_URL: "https://whop.com/checkout/plan_xxxx",
+  SUPABASE_ANON_KEY: "eyJ...",                              // already set
+  WHOP_CHECKOUT_URL: "https://whop.com/checkout/plan_xxxx",  // <- yours
   WHOP_PORTAL_URL: "https://whop.com/orders",
   PRICE_LABEL: "R147",
 };
 ```
 
-The anon key belongs in this file. It is designed to be public: every table has RLS
-enabled and the policies in the migration are what make it safe — the key grants
-nothing on its own.
+The anon key belongs in this file. It carries `"role": "anon"` and is designed to be
+public — RLS is what protects the data, and the key grants nothing on its own.
 
-**Never paste the `service_role` key here.** That one bypasses RLS entirely, and this
-file is served to anybody who opens the page.
+**Never put the `service_role` key here.** That one bypasses RLS entirely, and this file
+is served to anybody who opens the page. If you ever need to swap the anon key, check
+the `role` claim first: `echo "<key>" | cut -d. -f2 | base64 -d`.
+
+Step 1 is not optional. Until the migration runs there are no tables and no policies —
+and a project with no RLS is exactly the situation the anon key is not safe in.
 
 ### 3. Deploy the functions
 
@@ -71,11 +74,15 @@ supports `web_search_20260209`, which adds dynamic result filtering), and
 
 ### 4. Auth
 
-In **Authentication → Providers**, enable Email and (optionally) Google. In
-**URL Configuration**, add wherever you host the page as a redirect URL.
+Email sign-up is already enabled on this project, with email confirmation **on** — so
+sign-up shows "check your inbox" and waits for the link rather than silently landing on
+a logged-out dashboard.
 
-If email confirmation is on, sign-up says so and waits for the link rather than
-silently landing on a logged-out dashboard.
+Google is currently **off**. The page reads `/auth/v1/settings` at load and only draws
+the "Continue with Google" button when the provider is actually enabled, so turning it
+on in **Authentication → Providers** is enough to make the button appear — no edit to
+this file. Add wherever you host the page to **URL Configuration → Redirect URLs** at
+the same time.
 
 ### 5. Serve it
 
@@ -140,8 +147,10 @@ the most honest thing on the page.
 
 ## Verified
 
-- `index.html` rendered in Chromium at 1280px and 390px: no page errors, no horizontal
-  overflow, all nine landing-page arithmetic assertions passing.
+- `index.html` rendered in Chromium against the live project: all eight routes render,
+  the signed-out guard redirects `#/dashboard` to `#/login`, the Google button correctly
+  stays hidden, no page errors, no horizontal overflow at 390px, and all nine
+  landing-page arithmetic assertions pass.
 - Both Edge Functions typecheck clean under Deno against the real `@anthropic-ai/sdk`
   and `@supabase/supabase-js`.
 - The live pipeline has **not** been run end to end — that needs a real Anthropic key

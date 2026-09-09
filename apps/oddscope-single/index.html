@@ -345,8 +345,7 @@ for (const url of SUPABASE_CDNS) {
    ======================================================================== */
 const CONFIG = {
   SUPABASE_URL: "https://fttdtvmfzaggfihieurr.supabase.co",
-  SUPABASE_ANON_KEY: "PASTE_YOUR_ANON_KEY_HERE",
-  // Supabase -> Project Settings -> API -> Project API keys -> anon / public
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0dGR0dm1memFnZ2ZpaGlldXJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5ODM3NjIsImV4cCI6MjEwNDU1OTc2Mn0.LKpRDpXsQ5I5680B8ToU3aNprmd9RHzpNPpOn9EJAbY",
 
   WHOP_CHECKOUT_URL: "https://whop.com",
   WHOP_PORTAL_URL: "https://whop.com/orders",
@@ -504,6 +503,10 @@ const state = {
   session: null,
   profile: null,
   booted: false,
+  // Which sign-in methods this Supabase project actually has switched on.
+  // Read at boot rather than hardcoded, so enabling Google in the dashboard
+  // is enough to make the button appear — no edit to this file.
+  providers: { google: false },
 };
 
 let toastTimer;
@@ -1139,16 +1142,17 @@ function viewAuth(mode) {
         ${signup ? "Three days free. No card until day four." : "Welcome back."}
       </p>
 
-      <button class="btn btn-secondary btn-lg btn-block" style="margin-top:24px" data-google>
-        Continue with Google
-      </button>
+      ${state.providers.google ? `
+        <button class="btn btn-secondary btn-lg btn-block" style="margin-top:24px" data-google>
+          Continue with Google
+        </button>
 
-      <div class="row xs muted" style="margin:24px 0">
-        <span style="height:1px;flex:1;background:var(--navy-800)"></span>or
-        <span style="height:1px;flex:1;background:var(--navy-800)"></span>
-      </div>
+        <div class="row xs muted" style="margin:24px 0">
+          <span style="height:1px;flex:1;background:var(--navy-800)"></span>or
+          <span style="height:1px;flex:1;background:var(--navy-800)"></span>
+        </div>` : ""}
 
-      <form data-auth-form class="stack">
+      <form data-auth-form class="stack" ${state.providers.google ? "" : 'style="margin-top:24px"'}>
         ${signup ? `
           <div>
             <label class="field-label" for="name">Name</label>
@@ -2456,6 +2460,32 @@ async function render() {
 /* ===========================================================================
    Boot
    ======================================================================== */
+/**
+ * Ask the project which sign-in providers are switched on.
+ *
+ * Deliberately not awaited by boot(): if Supabase is slow or unreachable this
+ * request can hang for the browser's full default timeout, and blocking on it
+ * would leave the visitor staring at a blank page over a detail that only
+ * decides whether one button is drawn. It resolves in its own time and
+ * re-renders the auth pages if the answer changed.
+ */
+function probeAuthProviders() {
+  fetch(`${CONFIG.SUPABASE_URL}/auth/v1/settings`, {
+    headers: { apikey: CONFIG.SUPABASE_ANON_KEY },
+    signal: AbortSignal.timeout(6000),
+  })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((settings) => {
+      const google = Boolean(settings?.external?.google);
+      if (google === state.providers.google) return;
+      state.providers.google = google;
+      if (["/login", "/signup"].includes(routePath())) render();
+    })
+    .catch(() => {
+      // Leave the defaults. Email sign-in works either way.
+    });
+}
+
 async function boot() {
   const { data } = await sb.auth.getSession();
   state.session = data?.session ?? null;
@@ -2507,6 +2537,7 @@ if (!sb) {
     if (event === "SIGNED_IN" || event === "SIGNED_OUT") boot().then(render);
   });
 
+  probeAuthProviders();
   await boot();
   await render();
 }
