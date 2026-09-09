@@ -40,8 +40,9 @@ export function TierCard({
   children?: React.ReactNode;
 }) {
   const meta = TIER_META[view.tier];
-  // The one orchestrated motion moment: three cards over 400ms total.
-  const style = animate ? { animationDelay: `${index * 120}ms` } : undefined;
+  // The one orchestrated motion moment. 70ms stagger against a 260ms
+  // animation puts the last card's finish at exactly 400ms.
+  const style = animate ? { animationDelay: `${index * 70}ms` } : undefined;
 
   if (view.noValue) {
     return (
