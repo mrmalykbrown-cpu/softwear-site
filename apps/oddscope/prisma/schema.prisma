@@ -1,0 +1,186 @@
+// OddScope — data model.
+//
+// Three groups of tables live here:
+//   1. Auth (User, Account, Session, VerificationToken) — NextAuth's Prisma adapter
+//      owns the last three; we only ever read them.
+//   2. Billing fields on User — written exclusively by the Whop webhook handler.
+//   3. The analysis record itself (Analysis -> Recommendation), which is the product.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Neon and Supabase hand you a pooled (pgbouncer) URL that cannot run DDL.
+  // DIRECT_URL is the unpooled connection used for `migrate`. If your database
+  // has no pooler, set both variables to the same string.
+  directUrl = env("DIRECT_URL")
+}
+
+enum Plan {
+  TRIAL
+  ACTIVE
+  EXPIRED
+}
+
+enum AnalysisStatus {
+  PROCESSING
+  PENDING
+  SETTLED
+  FAILED
+}
+
+enum RiskTier {
+  SAFE
+  BALANCED
+  AGGRESSIVE
+}
+
+enum Outcome {
+  UNMARKED
+  WON
+  LOST
+  VOID
+}
+
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  name         String?
+  passwordHash String?
+  image        String?
+
+  // Billing — synced from Whop. Never written by the app itself, only by the
+  // webhook handler at /api/webhooks/whop.
+  whopMembershipId   String?   @unique
+  whopUserId         String?
+  plan               Plan      @default(TRIAL)
+  trialEndsAt        DateTime?
+  subscriptionEndsAt DateTime?
+
+  // Staking preferences
+  bankroll      Float?
+  stakeUnitSize Float?  @default(10)
+  currency      String  @default("ZAR")
+
+  // Self-imposed responsible-use limit. Null means no cap.
+  monthlyAnalysisLimit Int?
+
+  // Timestamp of the one-time risk acknowledgement. Null => show the modal.
+  riskAcknowledgedAt DateTime?
+
+  analyses Analysis[]
+  accounts Account[]
+  sessions Session[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Analysis {
+  id            String  @id @default(cuid())
+  userId        String
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  screenshotUrl String  @db.Text
+  userNotes     String?
+
+  homeTeam    String
+  awayTeam    String
+  competition String?
+  kickoff     DateTime?
+  bookmaker   String?
+
+  // Verbatim output of extraction call 1, kept so a pipeline change can be
+  // replayed against past screenshots without re-reading the image.
+  rawExtraction   Json
+  matchSummary    String? @db.Text
+  bookmakerMargin Float?
+
+  // Populated only when status is FAILED — shown to the user as-is.
+  failureReason String? @db.Text
+
+  recommendations Recommendation[]
+
+  status    AnalysisStatus @default(PENDING)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+}
+
+model Recommendation {
+  id         String   @id @default(cuid())
+  analysisId String
+  analysis   Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  tier RiskTier
+
+  // When true every field below is null: the model found no positive edge in
+  // this tier and declined to invent one. This is a result, not an absence.
+  noValue Boolean @default(false)
+
+  market             String?
+  selection          String?
+  odds               Float?
+  modelProbability   Float?
+  impliedProbability Float?
+  edgePercent        Float?
+  stakeUnits         Float?
+  rationale          String? @db.Text
+
+  outcome Outcome @default(UNMARKED)
+  // stakeAmount is money, in the user's currency, at the unit size in force
+  // when the analysis ran. profitLoss is in UNITS, so that history stays
+  // comparable across a change of unit size or currency.
+  stakeAmount Float?
+  profitLoss  Float?
+  settledAt   DateTime?
+
+  @@index([analysisId])
+  @@index([outcome])
+}
+
+// ---------------------------------------------------------------------------
+// NextAuth adapter tables. Shapes are dictated by @next-auth/prisma-adapter.
+// ---------------------------------------------------------------------------
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

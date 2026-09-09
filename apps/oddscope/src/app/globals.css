@@ -1,0 +1,153 @@
+@import "tailwindcss";
+
+/*
+  OddScope design tokens.
+
+  The product is an instrument, not a casino. Depth comes from background
+  lightness rather than shadow, numbers are monospaced and tabular so columns
+  never shift, and the crosshair ring is the only decorative motif.
+*/
+@theme {
+  /* Surfaces */
+  --color-navy-950: #0d1524;
+  --color-navy-900: #16233a;
+  --color-navy-800: #1f3050;
+
+  /* Brand */
+  --color-blue-500: #2563eb;
+  --color-blue-400: #3b82f6;
+
+  /* Text */
+  --color-slate-100: #f1f5f9;
+  --color-slate-400: #94a3b8;
+
+  /* Semantic — risk tiers */
+  --color-tier-safe: #38bdf8;
+  --color-tier-balanced: #f59e0b;
+  --color-tier-aggressive: #ef4444;
+
+  /* Semantic — outcomes */
+  --color-positive: #22c55e;
+  --color-negative: #ef4444;
+  --color-muted: #64748b;
+
+  /* Typography. Headings and UI in Space Grotesk; every number in IBM Plex
+     Mono so odds and percentages align in columns. */
+  --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", monospace;
+
+  /* Type scale: 12 / 14 / 16 / 20 / 28 / 40 / 60 */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.375rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.625rem;
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.75rem;
+  --text-xl--line-height: 2.125rem;
+  --text-2xl: 2.5rem;
+  --text-2xl--line-height: 2.75rem;
+  --text-3xl: 3.75rem;
+  --text-3xl--line-height: 3.875rem;
+
+  --radius-card: 12px;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-navy-950);
+    color: var(--color-slate-100);
+    font-family: var(--font-sans);
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  /* Every number in this product is a reading from an instrument. Tabular
+     figures keep columns from shifting width as values change. */
+  .tabular,
+  input[type="number"] {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-blue-400);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Body copy caps at 68 characters. */
+  .prose-measure {
+    max-width: 68ch;
+  }
+
+  ::selection {
+    background: var(--color-blue-500);
+    color: var(--color-slate-100);
+  }
+}
+
+/*
+  The single orchestrated motion moment: the three tier cards stagger in over
+  400ms once results land. Nothing else in the product animates on reveal.
+*/
+@keyframes tier-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.tier-reveal {
+  animation: tier-reveal 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* The crosshair ring: loading indicator and empty-state icon, nowhere else. */
+@keyframes crosshair-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.crosshair-spin {
+  animation: crosshair-spin 2.4s linear infinite;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tier-reveal {
+    animation: none;
+  }
+
+  .crosshair-spin {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

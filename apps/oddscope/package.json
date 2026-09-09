@@ -1,0 +1,49 @@
+{
+  "name": "oddscope",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OddScope \u2014 screenshot a bookmaker's odds board, get three risk-tiered bets with the edge shown in writing.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
+    "@next-auth/prisma-adapter": "^1.0.7",
+    "@prisma/client": "^6.19.3",
+    "@vercel/blob": "^2.8.0",
+    "bcryptjs": "^3.0.3",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.43.0",
+    "next": "^15.5.25",
+    "next-auth": "^4.24.15",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^3.10.1",
+    "server-only": "^0.0.1",
+    "tailwind-merge": "^2.6.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22.20.2",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^9.18.0",
+    "eslint-config-next": "^15.5.25",
+    "prisma": "^6.19.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.7.0",
+    "vitest": "^5.0.0"
+  }
+}
